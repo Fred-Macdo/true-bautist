@@ -1,0 +1,124 @@
+# Trading System Configuration
+
+# API Configuration
+api:
+  paper_trading: true
+  # API keys should be in .env file, not here
+  ALPACA_API_KEY: PKRCOBQM80UB0GCY31SX
+  ALPACA_API_SECRET: gASQdboTadHQPBwBV2qSMieNYWP8gYexbyxt97IC
+
+# Trading Strategy Configuration
+strategy:
+  name: "Moving Average Crossover with RSI"
+  
+  # Technical Indicators
+  indicators:
+    - name: "SMA20"
+      type: "SMA"
+      parameters:
+        period: 20
+    
+    - name: "SMA50"
+      type: "SMA"
+      parameters:
+        period: 50
+    
+    - name: "RSI"
+      type: "RSI"
+      parameters:
+        period: 14
+    
+    - name: "MACD"
+      type: "MACD"
+      parameters: {}  # Default parameters
+    
+    - name: "ATR"
+      type: "ATR"
+      parameters:
+        period: 14
+
+  # Entry Conditions
+  entry_conditions:
+    - type: "CROSS_ABOVE"
+      indicator1: "SMA20"
+      indicator2: "SMA50"
+    
+    - type: "RANGE"
+      indicator: "RSI"
+      min: 30
+      max: 70
+
+  # Exit Conditions
+  exit_conditions:
+    - type: "CROSS_BELOW"
+      indicator1: "SMA20"
+      indicator2: "SMA50"
+    
+    - type: "ABOVE"
+      indicator: "RSI"
+      value: 80
+
+  # Risk Management
+  risk_management:
+    position_sizing:
+      type: "PERCENT_EQUITY"
+      value: 0.05  # 5% of equity per position
+    
+    stop_loss:
+      type: "PERCENT"
+      value: 0.02  # 2% stop loss
+    
+    take_profit:
+      type: "PERCENT"
+      value: 0.06  # 6% take profit
+    
+    max_position_size: 100000  # Maximum position size in dollars
+    max_positions: 5  # Maximum number of concurrent positions
+
+# Market Scanner Configuration
+scanner:
+  watchlist:
+    - AAPL
+    - MSFT
+    - GOOGL
+    - AMZN
+    - META
+  
+  screening_criteria:
+    volume_filter:
+      min_volume: 1000000  # Minimum daily volume
+    
+    price_filter:
+      min_price: 10
+      max_price: 500
+    
+    volatility_filter:
+      min_atr_percent: 1.5
+    
+  macro_analysis:
+    enabled: true
+    update_interval: 3600  # seconds
+    risk_levels:
+      high_volatility: 25
+      high_risk_rsi: 75
+      low_risk_rsi: 25
+
+# Trading Parameters
+trading:
+  trading_hours:
+    start: "09:30"  # Market open
+    end: "16:00"    # Market close
+  
+  execution:
+    order_type: "MARKET"  # MARKET, LIMIT
+    time_in_force: "DAY"  # DAY, GTC, IOC
+  
+  monitoring:
+    performance_update_interval: 300  # seconds
+    log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "trading_log.txt"
+  format: "%(asctime)s - %(levelname)s - %(message)s"

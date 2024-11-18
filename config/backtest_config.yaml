@@ -1,0 +1,44 @@
+# Backtesting Configuration
+backtest:
+  start_date: "2023-01-01"
+  end_date: "2023-12-31"
+  initial_capital: 100000
+  commission: 0.001  # 0.1%
+  slippage: 0.001   # 0.1%
+  timeframe: "1H"   # 1D, 1H, 15Min
+  
+  # Data requirements
+  data:
+    symbols:
+      - PLTR
+      - TSLA
+      - SOFI
+      - AMD
+      - HIMS
+    
+    price_type: "close"  # close, ohlcv
+    adjust_prices: true  # adjust for splits and dividends
+  
+  # Performance analysis
+  analysis:
+    benchmark: "SPY"  # Compare against S&P 500
+    risk_free_rate: 0.02  # 2% annual risk-free rate
+    
+    # Metrics to calculate
+    metrics:
+      - total_return
+      - annual_return
+      - sharpe_ratio
+      - sortino_ratio
+      - max_drawdown
+      - win_rate
+      - profit_factor
+      - calmar_ratio
+    
+    # Generate plots
+    plots:
+      - equity_curve
+      - drawdown
+      - returns_distribution
+      - monthly_returns
+      - rolling_sharpe
