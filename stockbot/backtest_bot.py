@@ -6,6 +6,8 @@ import numpy as np
 from datetime import datetime
 from scipy import stats
 from DataManager import *
+import warnings
+warnings.filterwarnings("ignore")
 
 class Backtest:
 
@@ -64,21 +66,6 @@ class Backtest:
         
         return strategies
 
-    def _get_all_symbols(self) -> List[str]:
-        """Get all unique symbols from the configuration."""
-        symbols = set()
-        
-        # Add symbols from universe configuration
-        if self.config['data']['universe']['type'] == 'static':
-            symbols.update(self.config['data']['universe']['symbols'])
-        
-        # Add symbols from individual strategies
-        for strategy_config in self.config['strategies'].values():
-            if 'symbols' in strategy_config:
-                symbols.update(strategy_config['symbols'])
-        
-        return list(symbols)
-
     def _calculate_drawdown_metrics(self, returns: pd.Series) -> Dict[str, float]:
         """Calculate detailed drawdown metrics."""
         cum_returns = (1 + returns).cumprod()
@@ -97,6 +84,21 @@ class Backtest:
             'avg_drawdown_duration': drawdown_duration[drawdown_duration > 0].mean(),
             'drawdown_frequency': (drawdowns < 0).mean()
         }
+    
+    def _get_all_symbols(self) -> List[str]:
+        """Get all unique symbols from the configuration."""
+        symbols = set()
+        
+        # Add symbols from universe configuration
+        if self.config['data']['universe']['type'] == 'static':
+            symbols.update(self.config['data']['universe']['symbols'])
+        
+        # Add symbols from individual strategies
+        for strategy_config in self.config['strategies'].values():
+            if 'symbols' in strategy_config:
+                symbols.update(strategy_config['symbols'])
+        
+        return list(symbols)
 
     def _calculate_trade_metrics(self, signals: pd.Series, returns: pd.Series) -> Dict[str, float]:
         """Calculate trade-specific metrics."""
@@ -175,64 +177,51 @@ class Backtest:
         """Helper function to calculate maximum consecutive True values."""
         return max((series * (series.groupby((series != series.shift()).cumsum()).cumcount() + 1)).max(), 0)
     
-    def run(self) -> Dict[str, pd.DataFrame]:
+    def run(self, benchmark_returns: pd.Series = None) -> Dict[str, pd.DataFrame]:
         """
-        Run backtest for all strategies across their specified symbols.
+        Run the backtest for all configured strategies.
+        
+        Args:
+            data: DataFrame with OHLCV data
+            benchmark_returns: Optional benchmark returns series for comparison
+            
+        Returns:
+            Dictionary containing results for each strategy
         """
-        # Fetch historical data for all symbols in the universe
+
         data = self.market_data.get_historical_data(
             symbols=self._get_all_symbols(),
             start_date=self.config['data']['parameters']['history_start'],
             end_date=pd.Timestamp.now().strftime('%Y-%m-%d'),
             interval=self.config['data']['parameters']['interval']
         )
-        
-        # Run strategies
+
         for strategy_name, strategy in self.strategies.items():
-            strategy_config = self.config['strategies'][strategy_name]
-            strategy_symbols = strategy_config.get('symbols', [])
-            
-            # Initialize strategy results
-            self.results[strategy_name] = {
-                'positions': pd.DataFrame(),
-                'portfolio_value': pd.Series(dtype=float),
-                'returns': pd.Series(dtype=float)
-            }
-            
-            # Process each symbol for the strategy
-            for symbol in strategy_symbols:
-                if symbol not in data:
-                    print(f"Warning: No data available for {symbol} in {strategy_name}")
-                    continue
-                    
-                # Generate signals for this symbol
-                signals = strategy.generate_signals(data[symbol])
+            for symbol, market_data in data.items():
                 
-                # Apply risk management if configured
-                if 'risk_management' in self.config:
-                    signals = self._apply_risk_management(signals, data[symbol], strategy_name)
+                signals = strategy.generate_signals(market_data)
                 
-                # Calculate symbol-specific returns
+                # Calculate returns
                 position_changes = signals.diff()
-                returns = pd.Series(0.0, index=data[symbol].index)
+                returns = pd.Series(0.0, index=market_data.index)
                 
-                for i in range(1, len(data[symbol])):
-                    if signals[i-1] != 0:
+                for i in range(1, len(market_data)):
+                    if signals[i-1] != 0:  # If we have a position
                         returns[i] = signals[i-1] * (
-                            data[symbol]['close'][i] / data[symbol]['close'][i-1] - 1
+                            market_data['close'][i] / market_data['close'][i-1] - 1
                         )
                 
-                # Store symbol-specific results
-                self.results[strategy_name][symbol] = {
+                # Calculate metrics
+                cumulative_returns = (1 + returns).cumprod()
+                drawdown = cumulative_returns / cumulative_returns.cummax() - 1
+                
+                self.results[strategy_name] = pd.DataFrame({
                     'signals': signals,
                     'returns': returns,
-                    'cumulative_returns': (1 + returns).cumprod(),
-                    'drawdown': self._calculate_drawdown_metrics(returns)
-                }
+                    'cumulative_returns': cumulative_returns,
+                    'drawdown': drawdown
+                })
             
-            # Calculate portfolio-level metrics
-            self.get_performance_metrics(strategy_name)
-        
         return self.results
     
     def get_performance_metrics(self, benchmark_returns: pd.Series = None) -> Dict[str, Dict]:
@@ -270,23 +259,3 @@ class Backtest:
             }
         
         return metrics
-
-    def _initialize_strategies(self) -> Dict[str, Strategy]:
-        """Initialize strategy objects based on configuration."""
-        strategy_map = {
-            'MovingAverageCrossover': MovingAverageCrossover,
-            'RSIStrategy': RSIStrategy,
-            'BollingerBandsStrategy': BollingerBandsStrategy,
-            'MACDStrategy': MACDStrategy,
-            'IchimokuStrategy': IchimokuStrategy,
-            'VolumeWeightedMAStrategy': VolumeWeightedMAStrategy,
-            'AdaptiveMovingAverageStrategy': AdaptiveMovingAverageStrategy,
-            'DualThrustStrategy': DualThrustStrategy
-        }
-        
-        strategies = {}
-        for strategy_name, strategy_config in self.config['strategies'].items():
-            strategy_class = strategy_map[strategy_config['type']]
-            strategies[strategy_name] = strategy_class(strategy_config['parameters'])
-        
-        return strategies
