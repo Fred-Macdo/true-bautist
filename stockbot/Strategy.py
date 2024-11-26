@@ -1,7 +1,22 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Callable, Tuple
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
+
+@dataclass
+class Signal:
+    """Trading signal details"""
+    symbol: str
+    timestamp: datetime
+    direction: str  # 'buy', 'sell', 'hold'
+    strength: float  # 0 to 1
+    trade_type: str  # 'entry', 'exit', 'adjustment'
+    price: float
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    metadata: Dict = None
 
 class Strategy(ABC):
     def __init__(self, parameters: Dict[str, Any]):
@@ -11,6 +26,191 @@ class Strategy(ABC):
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         pass
+
+class MultiFactorStrategy(Strategy):
+    def __init__(self, parameters: Dict[str, Any]):
+        super().__init__(parameters)
+        self.indicators: Dict[str, Callable] = {}
+        self.entry_conditions: List[Callable] = []
+        self.exit_conditions: List[Callable] = []
+        self.risk_filters: List[Callable] = []
+        self.position_sizing: Optional[Callable] = None
+        
+    def add_indicator(self, name: str, calculation_func: Callable):
+        """Add a technical indicator"""
+        self.indicators[name] = calculation_func
+        
+    def add_entry_condition(self, condition_func: Callable):
+        """Add entry condition"""
+        self.entry_conditions.append(condition_func)
+        
+    def add_exit_condition(self, condition_func: Callable):
+        """Add exit condition"""
+        self.exit_conditions.append(condition_func)
+        
+    def add_risk_filter(self, filter_func: Callable):
+        """Add risk management filter"""
+        self.risk_filters.append(filter_func)
+        
+    def set_position_sizing(self, sizing_func: Callable):
+        """Set position sizing function"""
+        self.position_sizing = sizing_func
+
+    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
+        """Generate trading signals using multi-factor analysis"""
+        signals = pd.Series(0, index=data.index)
+        
+        try:
+            # Convert single DataFrame to dict format expected by multi-factor analysis
+            data_dict = {self.parameters.get('symbol', 'default'): data}
+            market_condition = self.parameters.get('market_condition', {'risk_level': 'medium'})
+            
+            # Generate detailed signals
+            detailed_signals = self._generate_detailed_signals(data_dict, market_condition)
+            
+            # Convert detailed signals to simple signal series (-1, 0, 1)
+            for signal in detailed_signals:
+                idx = signal.timestamp
+                signals[idx] = 1 if signal.direction == 'buy' else -1 if signal.direction == 'sell' else 0
+                
+        except Exception as e:
+            print(f"Error generating signals: {e}")
+            
+        return signals
+    
+    def _generate_detailed_signals(self, data: Dict[str, pd.DataFrame], market_condition: Dict) -> List[Signal]:
+        """Generate detailed trading signals using multi-factor analysis"""
+        signals = []
+        
+        for symbol, df in data.items():
+            try:
+                # Calculate indicators
+                indicators = self._calculate_indicators(df)
+                
+                # Check risk filters
+                if not self._pass_risk_filters(df, indicators, market_condition):
+                    continue
+                
+                # Generate signal
+                signal = self._evaluate_conditions(symbol, df, indicators, market_condition)
+                if signal:
+                    signals.append(signal)
+                    
+            except Exception as e:
+                print(f"Error generating signal for {symbol}: {e}")
+                
+        return signals
+    
+    def _calculate_indicators(self, df: pd.DataFrame) -> Dict:
+        """Calculate all technical indicators"""
+        return {
+            name: func(df) for name, func in self.indicators.items()
+        }
+    
+    def _pass_risk_filters(
+        self,
+        df: pd.DataFrame,
+        indicators: Dict,
+        market_condition: Dict
+    ) -> bool:
+        """Check if all risk filters pass"""
+        return all(
+            filter_func(df, indicators, market_condition)
+            for filter_func in self.risk_filters
+        )
+    
+    def _evaluate_conditions(
+        self,
+        symbol: str,
+        df: pd.DataFrame,
+        indicators: Dict,
+        market_condition: Dict
+    ) -> Optional[Signal]:
+        """Evaluate entry and exit conditions"""
+        # Check entry conditions
+        entry_strength = self._check_conditions(
+            df, indicators, market_condition, self.entry_conditions
+        )
+        
+        # Check exit conditions
+        exit_strength = self._check_conditions(
+            df, indicators, market_condition, self.exit_conditions
+        )
+        
+        # Generate signal based on condition strengths
+        if entry_strength > 0.5 and entry_strength > exit_strength:
+            return self._create_signal(symbol, df, 'buy', entry_strength, indicators)
+        elif exit_strength > 0.5:
+            return self._create_signal(symbol, df, 'sell', exit_strength, indicators)
+            
+        return None
+    
+    def _check_conditions(
+        self,
+        df: pd.DataFrame,
+        indicators: Dict,
+        market_condition: Dict,
+        conditions: List[Callable]
+    ) -> float:
+        """Check conditions and return strength (0 to 1)"""
+        if not conditions:
+            return 0
+            
+        strengths = [
+            condition(df, indicators, market_condition)
+            for condition in conditions
+        ]
+        
+        return sum(strengths) / len(strengths)
+    
+    def _create_signal(
+        self,
+        symbol: str,
+        df: pd.DataFrame,
+        direction: str,
+        strength: float,
+        indicators: Dict
+    ) -> Signal:
+        """Create a trading signal with stop loss and take profit"""
+        current_price = df['close'].iloc[-1]
+        atr = self._calculate_atr(df)
+        
+        # Calculate stop loss and take profit based on ATR
+        if direction == 'buy':
+            stop_loss = current_price - 2 * atr
+            take_profit = current_price + 3 * atr
+        else:
+            stop_loss = current_price + 2 * atr
+            take_profit = current_price - 3 * atr
+        
+        return Signal(
+            symbol=symbol,
+            timestamp=df.index[-1],
+            direction=direction,
+            strength=strength,
+            trade_type='entry',
+            price=current_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            metadata={
+                'indicators': indicators,
+                'atr': atr
+            }
+        )
+    
+    @staticmethod
+    def _calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
+        """Calculate Average True Range"""
+        high = df['high']
+        low = df['low']
+        close = df['close']
+        
+        tr1 = high - low
+        tr2 = abs(high - close.shift())
+        tr3 = abs(low - close.shift())
+        
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        return tr.rolling(period).mean().iloc[-1]
 
 class MovingAverageCrossover(Strategy):
     """

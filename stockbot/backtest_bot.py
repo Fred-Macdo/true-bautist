@@ -1,11 +1,11 @@
-from Strategy import *
+from .Strategy import *
 import yaml
 from typing import Dict, List
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from scipy import stats
-from DataManager import *
+from .DataManager import *
 import warnings
 warnings.filterwarnings("ignore")
 

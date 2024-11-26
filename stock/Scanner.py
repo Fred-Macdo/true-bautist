@@ -439,7 +439,25 @@ class MarketScanner:
             
         return sector_performance
 
-    def scan_for_volume_breakouts(self, volume_threshold: float = 2.0, price_change_threshold: float = 2.0) -> Dict[str, Dict]:
+    
+
+    def _calculate_correlation_matrix(self, data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        """Calculate correlation matrix between different market components"""
+        # Extract closing prices
+        closes = pd.DataFrame({
+            symbol: data[symbol]['close']
+            for symbol in data.keys()
+        })
+        
+        # Calculate correlation matrix
+        return closes.corr().round(2)
+
+    @staticmethod
+    def _calculate_percentile(series: pd.Series, value: float) -> float:
+        """Calculate the percentile of a value within a series"""
+        return len(series[series <= value]) / len(series) * 100
+
+    def scan_for_volume_breakouts(self, volume_threshold: float = 1.0, price_change_threshold: float = 1.5) -> Dict[str, Dict]:
         """
         Scan for stocks showing unusual volume activity indicating potential breakouts
         
@@ -459,17 +477,18 @@ class MarketScanner:
             
             for symbol, df in data.items():
                 # Calculate volume metrics
+
                 avg_volume = df['volume'].rolling(window=20).mean()
                 current_volume = df['volume'].iloc[-1]
-                volume_ratio = round((current_volume / avg_volume.iloc[-1]) * 100, 2)
-                
+                volume_ratio = round((current_volume / avg_volume.iloc[-1]), 2)
+             
                 # Calculate price metrics
-                price_change = round((df['close'].iloc[-1] / df['close'].iloc[-2] - 1) * 100, 2)
-                
+                price_change = round((df['close'].iloc[-1] / df['close'].iloc[-2] - 1)*100, 2)
+                print(symbol," volume_ratio: ",volume_ratio, " price_change: ", price_change)
                 # Check for breakout conditions
                 if (volume_ratio > volume_threshold * 100 and 
                     abs(price_change) > price_change_threshold):
-                    
+                    #print(symbol," volume_ratio: ",volume_ratio, " volume_threshold: ", volume_threshold)
                     # Calculate additional metrics
                     atr = self._calculate_atr(df)
                     price_range = round((df['high'].iloc[-1] - df['low'].iloc[-1]) / df['close'].iloc[-1] * 100, 2)
@@ -485,27 +504,11 @@ class MarketScanner:
                         'breakout_direction': 'up' if price_change > 0 else 'down'
                     }
             
-            return breakout_candidates
+            return breakout_candidates, data
             
         except Exception as e:
             print(f"Error scanning for volume breakouts: {e}")
             return {}
-
-    def _calculate_correlation_matrix(self, data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-        """Calculate correlation matrix between different market components"""
-        # Extract closing prices
-        closes = pd.DataFrame({
-            symbol: data[symbol]['close']
-            for symbol in data.keys()
-        })
-        
-        # Calculate correlation matrix
-        return closes.corr().round(2)
-
-    @staticmethod
-    def _calculate_percentile(series: pd.Series, value: float) -> float:
-        """Calculate the percentile of a value within a series"""
-        return len(series[series <= value]) / len(series) * 100
 
     def _calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """Calculate Average True Range"""
