@@ -125,6 +125,7 @@ class MarketScanner:
         try:
             # Get data for all macro symbols
             all_symbols = [sym for syms in self.macro_symbols.values() for sym in syms]
+            print(all_symbols)
             data = self._get_stock_data(
                 all_symbols,
                 start=self.starttime,
@@ -295,9 +296,9 @@ class MarketScanner:
                 'overall': volatility,
                 'details': {
                     'current_vix': current_vix,
-                    'vix_20d_avg': vix_avg,
-                    'vix_percentile': vix_percentile,
-                    'vix_trend': current_vix / vix_avg - 1
+                    'vix_20d_avg': round(vix_avg, 2),
+                    'vix_percentile': round(vix_percentile, 2),
+                    'vix_trend': round((current_vix / vix_avg - 1) % 100, 2)
                 }
             }
             
@@ -439,8 +440,6 @@ class MarketScanner:
             
         return sector_performance
 
-    
-
     def _calculate_correlation_matrix(self, data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         """Calculate correlation matrix between different market components"""
         # Extract closing prices
@@ -486,7 +485,7 @@ class MarketScanner:
                 price_change = round((df['close'].iloc[-1] / df['close'].iloc[-2] - 1)*100, 2)
                 print(symbol," volume_ratio: ",volume_ratio, " price_change: ", price_change)
                 # Check for breakout conditions
-                if (volume_ratio > volume_threshold * 100 and 
+                if (volume_ratio > volume_threshold and 
                     abs(price_change) > price_change_threshold):
                     #print(symbol," volume_ratio: ",volume_ratio, " volume_threshold: ", volume_threshold)
                     # Calculate additional metrics

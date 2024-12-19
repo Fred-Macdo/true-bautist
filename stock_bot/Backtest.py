@@ -1,4 +1,4 @@
-from .Strategy import *
+from .Strategy import Strategy  # Note we only import the Strategy class now
 import yaml
 from typing import Dict, List
 import pandas as pd
@@ -10,7 +10,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 class Backtest:
-
     """
     Main backtesting engine that processes strategies and generates results.
     """
@@ -22,18 +21,17 @@ class Backtest:
             config_path: Path to YAML configuration file
         """
         self.config = self._load_config(config_path)
-        # Initialize market data manager first
         self.market_data = MarketData(self.config.get('data', {}))
         self.strategies = self._initialize_strategies()
         self.results = {}
-        
+    
     def _load_config(self, config_path: str) -> Dict:
         """Load and parse the YAML configuration file."""
         try:
+            print('Loading Config \n')
             with open(config_path, 'r') as file:
                 config = yaml.safe_load(file)
                 
-            # Ensure required config sections exist
             required_sections = ['data', 'strategies']
             for section in required_sections:
                 if section not in config:
@@ -48,26 +46,25 @@ class Backtest:
     
     def _initialize_strategies(self) -> Dict[str, Strategy]:
         """Initialize strategy objects based on configuration."""
-        strategy_map = {
-            'MovingAverageCrossover': MovingAverageCrossover,
-            'RSIStrategy': RSIStrategy,
-            'BollingerBandsStrategy': BollingerBandsStrategy,
-            'MACDStrategy': MACDStrategy,
-            'IchimokuStrategy': IchimokuStrategy,
-            'VolumeWeightedMAStrategy': VolumeWeightedMAStrategy,
-            'AdaptiveMovingAverageStrategy': AdaptiveMovingAverageStrategy,
-            'DualThrustStrategy': DualThrustStrategy
-        }
-        
+        print('Initializing Strategies \n')
         strategies = {}
         for strategy_name, strategy_config in self.config['strategies'].items():
-            strategy_class = strategy_map[strategy_config['type']]
-            strategies[strategy_name] = strategy_class(strategy_config['parameters'])
-        
+            print(strategy_name, "config: ", strategy_config)
+            if strategy_config.get('enabled', True):
+                strategies[strategy_name] = Strategy(strategy_config['parameters'])
         return strategies
 
     def _calculate_drawdown_metrics(self, returns: pd.Series) -> Dict[str, float]:
-        """Calculate detailed drawdown metrics."""
+        """
+        Calculate detailed drawdown metrics.
+        
+        Returns a dictionary containing:
+        - max_drawdown: Maximum peak-to-trough decline (percentage)
+        - avg_drawdown: Average drawdown when in drawdown (percentage)
+        - max_drawdown_duration: Longest drawdown period (days)
+        - avg_drawdown_duration: Average length of drawdown periods (days)
+        - drawdown_frequency: Percentage of time spent in drawdown (percentage)
+        """
         cum_returns = (1 + returns).cumprod()
         rolling_max = cum_returns.cummax()
         drawdowns = cum_returns / rolling_max - 1
@@ -78,11 +75,11 @@ class Backtest:
         drawdown_duration = is_drawdown.groupby(drawdown_start).cumsum()
         
         return {
-            'max_drawdown': drawdowns.min(),
-            'avg_drawdown': drawdowns[drawdowns < 0].mean(),
-            'max_drawdown_duration': drawdown_duration.max(),
-            'avg_drawdown_duration': drawdown_duration[drawdown_duration > 0].mean(),
-            'drawdown_frequency': (drawdowns < 0).mean()
+            'max_drawdown': round(drawdowns.min() * 100, 2),  # Convert to percentage
+            'avg_drawdown': round(drawdowns[drawdowns < 0].mean() * 100, 2),  # Convert to percentage
+            'max_drawdown_duration': round(drawdown_duration.max(), 2),
+            'avg_drawdown_duration': round(drawdown_duration[drawdown_duration > 0].mean(), 2),
+            'drawdown_frequency': round((drawdowns < 0).mean() * 100, 2)  # Convert to percentage
         }
     
     def _get_all_symbols(self) -> List[str]:
@@ -101,7 +98,19 @@ class Backtest:
         return list(symbols)
 
     def _calculate_trade_metrics(self, signals: pd.Series, returns: pd.Series) -> Dict[str, float]:
-        """Calculate trade-specific metrics."""
+        """
+        Calculate trade-specific metrics.
+        
+        Returns a dictionary containing:
+        - total_trades: Total number of trades (count)
+        - win_rate: Percentage of profitable trades (percentage)
+        - avg_trade_return: Average return per trade (percentage)
+        - best_trade: Highest return from a single trade (percentage)
+        - worst_trade: Lowest return from a single trade (percentage)
+        - avg_winning_trade: Average return of profitable trades (percentage)
+        - avg_losing_trade: Average return of unprofitable trades (percentage)
+        - profit_factor: Ratio of gross profits over gross losses (ratio)
+        """
         trades = signals.diff().fillna(0)
         trades = trades[trades != 0]  # Only consider actual trades
         
@@ -123,18 +132,31 @@ class Backtest:
         trade_returns = pd.Series(trade_returns)
         
         return {
-            'total_trades': len(trades),
-            'win_rate': (trade_returns > 0).mean() if len(trade_returns) > 0 else 0,
-            'avg_trade_return': trade_returns.mean() if len(trade_returns) > 0 else 0,
-            'best_trade': trade_returns.max() if len(trade_returns) > 0 else 0,
-            'worst_trade': trade_returns.min() if len(trade_returns) > 0 else 0,
-            'avg_winning_trade': trade_returns[trade_returns > 0].mean() if len(trade_returns) > 0 else 0,
-            'avg_losing_trade': trade_returns[trade_returns < 0].mean() if len(trade_returns) > 0 else 0,
-            'profit_factor': abs(trade_returns[trade_returns > 0].sum() / trade_returns[trade_returns < 0].sum()) if len(trade_returns) > 0 and trade_returns[trade_returns < 0].sum() != 0 else 0
+            'total_trades': round(len(trades), 2),
+            'win_rate': round((trade_returns > 0).mean() * 100, 2) if len(trade_returns) > 0 else 0,  # Convert to percentage
+            'avg_trade_return': round(trade_returns.mean() * 100, 2) if len(trade_returns) > 0 else 0,  # Convert to percentage
+            'best_trade': round(trade_returns.max() * 100, 2) if len(trade_returns) > 0 else 0,  # Convert to percentage
+            'worst_trade': round(trade_returns.min() * 100, 2) if len(trade_returns) > 0 else 0,  # Convert to percentage
+            'avg_winning_trade': round(trade_returns[trade_returns > 0].mean() * 100, 2) if len(trade_returns) > 0 else 0,  # Convert to percentage
+            'avg_losing_trade': round(trade_returns[trade_returns < 0].mean() * 100, 2) if len(trade_returns) > 0 else 0,  # Convert to percentage
+            'profit_factor': round(abs(trade_returns[trade_returns > 0].sum() / trade_returns[trade_returns < 0].sum()), 2) if len(trade_returns) > 0 and trade_returns[trade_returns < 0].sum() != 0 else 0
         }
 
     def _calculate_risk_metrics(self, returns: pd.Series) -> Dict[str, float]:
-        """Calculate risk-adjusted performance metrics."""
+        """
+        Calculate risk-adjusted performance metrics.
+        
+        Returns a dictionary containing:
+        - sharpe_ratio: Risk-adjusted return using volatility (ratio)
+        - sortino_ratio: Risk-adjusted return using downside volatility (ratio)
+        - calmar_ratio: Risk-adjusted return using maximum drawdown (ratio)
+        - volatility: Annualized standard deviation of returns (percentage)
+        - skewness: Asymmetry of returns distribution (ratio)
+        - kurtosis: Tail thickness of returns distribution (ratio)
+        - var_95: Value at Risk at 95% confidence level (percentage)
+        - cvar_95: Conditional Value at Risk at 95% confidence level (percentage)
+        - omega_ratio: Probability weighted ratio of gains over losses (ratio)
+        """
         risk_free_rate = 0.02  # Assuming 2% annual risk-free rate
         daily_rf = (1 + risk_free_rate) ** (1/252) - 1
         
@@ -142,19 +164,32 @@ class Backtest:
         negative_returns = returns[returns < 0]
         
         return {
-            'sharpe_ratio': np.sqrt(252) * (returns.mean() - daily_rf) / returns.std() if returns.std() != 0 else 0,
-            'sortino_ratio': np.sqrt(252) * (returns.mean() - daily_rf) / negative_returns.std() if len(negative_returns) > 0 and negative_returns.std() != 0 else 0,
-            'calmar_ratio': (returns.mean() * 252) / abs(self._calculate_drawdown_metrics(returns)['max_drawdown']) if self._calculate_drawdown_metrics(returns)['max_drawdown'] != 0 else 0,
-            'volatility': returns.std() * np.sqrt(252),
-            'skewness': stats.skew(returns),
-            'kurtosis': stats.kurtosis(returns),
-            'var_95': returns.quantile(0.05),
-            'cvar_95': returns[returns <= returns.quantile(0.05)].mean(),
-            'omega_ratio': returns[returns > 0].mean() / abs(returns[returns < 0].mean()) if len(returns[returns < 0]) > 0 and returns[returns < 0].mean() != 0 else 0
+            'sharpe_ratio': round(np.sqrt(252) * (returns.mean() - daily_rf) / returns.std() if returns.std() != 0 else 0, 2),
+            'sortino_ratio': round(np.sqrt(252) * (returns.mean() - daily_rf) / negative_returns.std() if len(negative_returns) > 0 and negative_returns.std() != 0 else 0, 2),
+            'calmar_ratio': round((returns.mean() * 252) / abs(self._calculate_drawdown_metrics(returns)['max_drawdown']/100) if self._calculate_drawdown_metrics(returns)['max_drawdown'] != 0 else 0, 2),
+            'volatility': round(returns.std() * np.sqrt(252) * 100, 2),  # Convert to percentage
+            'skewness': round(stats.skew(returns), 2),
+            'kurtosis': round(stats.kurtosis(returns), 2),
+            'var_95': round(returns.quantile(0.05) * 100, 2),  # Convert to percentage
+            'cvar_95': round(returns[returns <= returns.quantile(0.05)].mean() * 100, 2),  # Convert to percentage
+            'omega_ratio': round(returns[returns > 0].mean() / abs(returns[returns < 0].mean()) if len(returns[returns < 0]) > 0 and returns[returns < 0].mean() != 0 else 0, 2)
         }
 
     def _calculate_timing_metrics(self, returns: pd.Series, benchmark_returns: pd.Series = None) -> Dict[str, float]:
-        """Calculate market timing and consistency metrics."""
+        """
+        Calculate market timing and consistency metrics.
+        
+        Returns a dictionary containing:
+        - avg_monthly_return: Average return per month (percentage)
+        - monthly_return_std: Standard deviation of monthly returns (percentage)
+        - positive_months: Percentage of months with positive returns (percentage)
+        - avg_up_month: Average return during positive months (percentage)
+        - avg_down_month: Average return during negative months (percentage)
+        - avg_rolling_beta: Average sensitivity to market movements (ratio)
+        - beta_std: Stability of market sensitivity (ratio)
+        - consecutive_wins: Longest streak of profitable days (count)
+        - consecutive_losses: Longest streak of unprofitable days (count)
+        """
         if benchmark_returns is None:
             benchmark_returns = pd.Series(0.0, index=returns.index)  # Use zero returns as benchmark if none provided
             
@@ -162,15 +197,15 @@ class Backtest:
         monthly_returns = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
         
         return {
-            'avg_monthly_return': monthly_returns.mean(),
-            'monthly_return_std': monthly_returns.std(),
-            'positive_months': (monthly_returns > 0).mean(),
-            'avg_up_month': monthly_returns[monthly_returns > 0].mean() if len(monthly_returns[monthly_returns > 0]) > 0 else 0,
-            'avg_down_month': monthly_returns[monthly_returns < 0].mean() if len(monthly_returns[monthly_returns < 0]) > 0 else 0,
-            'avg_rolling_beta': rolling_beta.mean(),
-            'beta_std': rolling_beta.std(),
-            'consecutive_wins': self._get_max_consecutive(returns > 0),
-            'consecutive_losses': self._get_max_consecutive(returns < 0)
+            'avg_monthly_return': round(monthly_returns.mean() * 100, 2),  # Convert to percentage
+            'monthly_return_std': round(monthly_returns.std() * 100, 2),  # Convert to percentage
+            'positive_months': round((monthly_returns > 0).mean() * 100, 2),  # Convert to percentage
+            'avg_up_month': round(monthly_returns[monthly_returns > 0].mean() * 100, 2) if len(monthly_returns[monthly_returns > 0]) > 0 else 0,  # Convert to percentage
+            'avg_down_month': round(monthly_returns[monthly_returns < 0].mean() * 100, 2) if len(monthly_returns[monthly_returns < 0]) > 0 else 0,  # Convert to percentage
+            'avg_rolling_beta': round(rolling_beta.mean(), 2),
+            'beta_std': round(rolling_beta.std(), 2),
+            'consecutive_wins': round(self._get_max_consecutive(returns > 0), 2),
+            'consecutive_losses': round(self._get_max_consecutive(returns < 0), 2)
         }
 
     def _get_max_consecutive(self, series: pd.Series) -> int:
@@ -232,7 +267,16 @@ class Backtest:
             benchmark_returns: Optional benchmark returns series for comparison
             
         Returns:
-            Dictionary containing detailed metrics for each strategy
+            Dictionary containing metrics for each strategy:
+            - Basic metrics:
+                - total_return: Total return over the period (percentage)
+                - annual_return: Annualized return (percentage)
+                - avg_daily_return: Average daily return (percentage)
+                - return_std: Standard deviation of daily returns (percentage)
+            - Drawdown metrics (see _calculate_drawdown_metrics)
+            - Trade metrics (see _calculate_trade_metrics)
+            - Risk metrics (see _calculate_risk_metrics)
+            - Timing metrics (see _calculate_timing_metrics)
         """
         metrics = {}
         
@@ -243,10 +287,10 @@ class Backtest:
             
             # Basic performance metrics
             basic_metrics = {
-                'total_return': (cum_returns.iloc[-1] - 1) * 100,
-                'annual_return': (cum_returns.iloc[-1] ** (252/len(returns)) - 1) * 100,
-                'avg_daily_return': returns.mean() * 100,
-                'return_std': returns.std() * 100
+                'total_return': round((cum_returns.iloc[-1] - 1) * 100, 2),  # Convert to percentage
+                'annual_return': round((cum_returns.iloc[-1] ** (252/len(returns)) - 1) * 100, 2),  # Convert to percentage
+                'avg_daily_return': round(returns.mean() * 100, 2),  # Convert to percentage
+                'return_std': round(returns.std() * 100, 2)  # Convert to percentage
             }
             
             # Combine all metrics

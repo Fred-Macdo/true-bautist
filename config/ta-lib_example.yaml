@@ -1,0 +1,43 @@
+symbol: "BTCUSDT"
+timeframe: "1h"
+mode: "backtest"
+
+indicators:
+  - name: "RSI"
+    params:
+      timeperiod: 14
+  
+  - name: "BBANDS"
+    params:
+      timeperiod: 20
+      nbdevup: 2
+      nbdevdn: 2
+      matype: 0
+  
+  - name: "MACD"
+    params:
+      fastperiod: 12
+      slowperiod: 26
+      signalperiod: 9
+
+  - name: "ATR"
+    params:
+      timeperiod: 14
+
+entry_conditions:
+  - indicator: "MACD"
+    comparison: "crosses_above"
+    value: "signal"  # compares macd line crossing above signal line
+    
+  - indicator: "BBANDS"
+    comparison: "crosses_below"
+    value: "lower"   # price crossing below lower band
+
+exit_conditions:
+  - indicator: "RSI"
+    comparison: "above"
+    value: 70
+    
+  - indicator: "ATR"
+    comparison: "above"
+    value: 25
