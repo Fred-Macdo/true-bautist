@@ -1,6 +1,15 @@
-symbol: "BTCUSDT"
+symbol: "SPY"
 timeframe: "1h"
 mode: "backtest"
+
+risk_management:
+  position_sizing_method: "atr_based"  # Options: fixed, risk_based, atr_based
+  risk_per_trade: 0.10  # 2% risk per trade
+  max_position_size: 1000
+  stop_loss: 0.05  # 5% stop loss
+  take_profit: 0.10  # 10% take profit
+  max_drawdown: 0.15  # 15% max drawdown
+  atr_multiplier: 2.0
 
 indicators:
   - name: "RSI"
@@ -10,33 +19,28 @@ indicators:
   - name: "BBANDS"
     params:
       timeperiod: 20
-      nbdevup: 2
-      nbdevdn: 2
+      nbdevup: 1.5
+      nbdevdn: 1.5
       matype: 0
   
-  - name: "MACD"
-    params:
-      fastperiod: 12
-      slowperiod: 26
-      signalperiod: 9
-
   - name: "ATR"
     params:
       timeperiod: 14
 
+# FOR BBANDS: value==, ["lowerband", "middleband", "upperband"]
+
 entry_conditions:
-  - indicator: "MACD"
-    comparison: "crosses_above"
-    value: "signal"  # compares macd line crossing above signal line
+  - indicator: "RSI"
+    comparison: "below"
+    value: 30  # compares macd line crossing above signal line
     
   - indicator: "BBANDS"
     comparison: "crosses_below"
-    value: "lower"   # price crossing below lower band
-
+    value: "lowerband"   
 exit_conditions:
   - indicator: "RSI"
     comparison: "above"
-    value: 70
+    value: 75
     
   - indicator: "ATR"
     comparison: "above"

@@ -1,10 +1,12 @@
+from abc import ABC, abstractmethod
 from codecs import utf_16_be_decode
 from dataclasses import dataclass
 from math import e
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import yaml
 
 @dataclass
 class BacktestResult:
@@ -14,6 +16,104 @@ class BacktestResult:
     equity_curve: pd.Series
     positions: pd.Series
     signals: pd.Series
+    evaluation_df: pd.DataFrame
+
+class Condition(ABC):
+    def __init__(self, indicator: str, comparison: str, value: Any):
+        self.indicator = indicator
+        self.comparison = comparison
+        self.value = value
+        
+
+    @abstractmethod
+    def evaluate(self, row: pd.Series) -> bool:
+        pass
+
+class IndicatorCondition(Condition):
+    def __str__(self):
+        return f'The indicator type is {self.indicator} and the comparison is {self.comparison} using {self.value}'
+
+    def __repr__(self):
+        return f'IndicatorCondition(\'{self.indicator}\', {self.comparison}, {self.value})'
+    
+    def evaluate(self, row: pd.Series) -> bool:
+        # Print available columns for debugging
+        print(f"\nEvaluating {self.indicator} condition:")
+        print(f"Comparison: {self.comparison}")
+        print(f"Value: {self.value}")
+        
+        # Handle special cases for indicators
+        if self.indicator == "MACD" and self.value == "signal":
+            macd_val = row.get('macd')
+            signal_val = row.get('macdsignal')
+            macd_prev = row.get('macd_prev')
+            signal_prev = row.get('macdsignal_prev')
+            
+            print(f"MACD values:")
+            print(f"Current MACD: {macd_val}")
+            print(f"Current Signal: {signal_val}")
+            print(f"Previous MACD: {macd_prev}")
+            print(f"Previous Signal: {signal_prev}")
+            
+            if any(pd.isna([macd_val, signal_val, macd_prev, signal_prev])):
+                print("Missing or NaN values detected")
+                return False
+                
+            if self.comparison == "crosses_above":
+                result = (macd_prev <= signal_prev) and (macd_val > signal_val)
+                print(f"Crosses above evaluation: {result}")
+                return result
+            elif self.comparison == "crosses_below":
+                result = (macd_prev >= signal_prev) and (macd_val < signal_val)
+                print(f"Crosses below evaluation: {result}")
+                return result
+                
+        elif self.indicator == "BBANDS" and self.value == "lower":
+            price = row.get('close')
+            lower = row.get('lowerband')  # lower band
+            price_prev = row.get('close_prev')
+            lower_prev = row.get('lowerband_prev')
+            
+            print(f"\nBBands check:")
+            print(f"Current price: {price}")
+            print(f"Current lower band: {lower}")
+            print(f"Previous price: {price_prev}")
+            print(f"Previous lower band: {lower_prev}")
+            
+            if any(pd.isna([price, lower, price_prev, lower_prev])):
+                print("Missing or NaN values detected")
+                return False
+                
+            if self.comparison == "crosses_below":
+                result = price_prev >= lower_prev and price < lower
+                print(f"Crosses below evaluation: {result}")
+                return result
+            elif self.comparison == "crosses_above":
+                result = price_prev <= lower_prev and price > lower
+                print(f"Crosses above evaluation: {result}")
+                return result
+                
+        else:
+            # Standard indicator comparison
+            indicator_value = row.get(self.indicator.lower())
+            if pd.isna(indicator_value):
+                return False
+
+            if isinstance(self.value, (int, float)):
+                compare_value = self.value
+            else:
+                compare_value = row.get(self.value.lower())
+                if pd.isna(compare_value):
+                    return False
+
+            if self.comparison == "above":
+                print("indicator value: ", indicator_value, " / compare value: ", compare_value)
+                return indicator_value > compare_value
+            elif self.comparison == "below":
+                print("indicator value: ", indicator_value, " / compare value: ", compare_value)
+                return indicator_value < compare_value
+
+        return False    
 
 class DataFrameBacktester:
     def __init__(self, config_path: str):
@@ -30,38 +130,77 @@ class DataFrameBacktester:
         self.entry_price = 0
         self.position_size = 0
 
+    def _setup_conditions(conditions_config: List[Dict]) -> List[Condition]:
+        return [IndicatorCondition(
+            indicator=cond['indicator'],
+            comparison=cond['comparison'],
+            value=cond['value']
+        ) for cond in conditions_config]
+
+    def _check_condition(self, row: pd.Series, condition_config: Dict) -> bool:
+        """Check a single condition based on configuration"""
+        try:
+            indicator = condition_config['indicator']
+            print("\n")
+            print("1. indicator: ", indicator)
+            comparison = condition_config['comparison']
+            print("2. comparison: ", comparison)
+            value = condition_config['value']
+            print("3. Value: ", value)
+            # Get current and previous values
+
+            # COMPARISON FLOW
+            if comparison == "above":
+                current_value = row[indicator.lower()]        
+                return current_value > value
+            elif comparison == "below":
+                current_value = row[indicator.lower()]
+                return current_value < value
+            
+
+            elif comparison == "crosses_above":
+                if indicator == "MACD":
+                    macd_cross_above = (row['macd'] > row['macd_signal']) & (row['macd_prev'] <= row['macdsignal_prev'])
+                    return macd_cross_above
+                elif indicator == "BBANDS":
+                    bb_cross_above = (row['close'] > row[value]) & (row['close_prev'] <= row[value])
+                    return bb_cross_above
+           
+            elif comparison == "crosses_below":
+                if indicator == "MACD":
+                    macd_cross_below = (row['macd'] < row['macd_signal']) & (row['macd_prev'] >= row['macdsignal_prev'])
+                    return macd_cross_below
+
+                elif indicator == "BBANDS":
+                    print(f"({row['close']} < {row[value]}) & ({row['close_prev']} >= {row[value]})")
+                    bb_cross_below = (row['close'] < row[value]) & (row['close_prev'] >= row[value])
+                    return bb_cross_below
+
+            else:
+                print(f"Unknown comparison type: {comparison}")
+                return False
+                
+        except Exception as e:
+            print(e)
+            print(f"Error checking condition: {str(e)}")
+            print(f"Condition config: {condition_config}")
+            print(f"Available columns: {row.index.tolist()}")
+            return False
+
     def _check_entry_conditions(self, row: pd.Series) -> bool:
-        """Check if entry conditions are met"""
-        conditions = []
-        
-        # MACD condition
-        if 'macd' in row and 'macd_signal' in row:
-            macd_cross = (row['macd'] > row['macd_signal']) & (row['macd_prev'] <= row['macd_signal_prev'])
-            conditions.append(macd_cross)
-        
-        # Bollinger condition
-        if 'bb_lower' in row:
-            price_cross_lower = (row['close'] < row['bb_lower']) & (row['close_prev'] >= row['bb_lower_prev'])
-            conditions.append(price_cross_lower)
-        
-        return all(conditions)
+        """Check if all entry conditions are met"""
+        return all(
+            self._check_condition(row, condition)
+            for condition in self.config['entry_conditions']
+        )
 
     def _check_exit_conditions(self, row: pd.Series) -> bool:
-        """Check if exit conditions are met"""
-        conditions = []
-        
-        # ATR condition
-        if 'atr' in row:
-            atr_condition = row['atr'] > 25
-            conditions.append(atr_condition)
-        
-        # RSI condition
-        if 'rsi' in row and 'rsi_prev' in row:
-            rsi_cross = (row['rsi'] > 70) & (row['rsi_prev'] <= 70)
-            conditions.append(rsi_cross)
-        
-        return any(conditions)
-
+        """Check if any exit condition is met"""
+        return any(
+            self._check_condition(row, condition)
+            for condition in self.config['exit_conditions']
+        )
+    
     def _calculate_position_size(self, row: pd.Series, account_balance: float) -> float:
         """Calculate position size based on risk management rules"""
         try:
@@ -276,7 +415,8 @@ class DataFrameBacktester:
             metrics=metrics,
             equity_curve=equity_series,
             positions=positions,
-            signals=signals
+            signals=signals,
+            evaluation_df=data
         )
 
     def _calculate_metrics(self, trades: pd.DataFrame, equity: pd.Series, initial_balance: float) -> Dict[str, float]:
