@@ -16,7 +16,7 @@ class TechnicalIndicators:
         # Default parameters if none provided
         self.params = params or {
             'sma': {'period': 20},
-            'ema': {'period': 20},
+            'ema': {'period': 5},
             'rsi': {'period': 14},
             'bollinger_bands': {'period': 20, 'std_dev': 2},
             'atr': {'period': 14},
@@ -138,7 +138,6 @@ class TechnicalIndicators:
         Get all the previous values for close + indicator columns
         '''
         result_df = self.df.copy()
-        print('calculate previous values:  ')
         exclude_cols = ['open', 'high', 'low', 'volume', 'trade_count', 'vwap'] # don't get prev values
         prev_col_list = list(filter(lambda x: x not in exclude_cols, result_df.columns))
         

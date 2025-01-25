@@ -1,493 +1,327 @@
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, Optional, List, Callable, Tuple
-from dataclasses import dataclass
+from .AlpacaDataManager import AlpacaDataFetcher
+from .Indicators import TechnicalIndicators
+
+from typing import Dict, Any, List, Tuple, Optional, Callable
 from datetime import datetime
+import pandas as pd
+import numpy as np
 
-@dataclass
-class Signal:
-    """Trading signal details"""
-    symbol: str
-    timestamp: datetime
-    direction: str  # 'buy', 'sell', 'hold'
-    strength: float  # 0 to 1
-    trade_type: str  # 'entry', 'exit', 'adjustment'
-    price: float
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    metadata: Dict = None
 
-class Strategy:  # Remove ABC inheritance since we only have one strategy class now
-    def __init__(self, parameters: Dict[str, Any]):
-        self.parameters = parameters
+class Strategy:
+    """
+    Strategy class to define a trading strategy using a config file. 
+    The config file should contain the following keys:
+
+    - symbols: List of symbols to trade (e.g. ['AAPL', 'MSFT'])
+    - timeframe: Timeframe for historical data (e.g. '1D', '1H')
+    - start_date: Start date for historical data (e.g. '2021-01-01')
+    - end_date: End date for historical data (e.g. '2021-12-31')
+    - indicators: List of indicators to calculate
+    - entry_conditions: List of conditions for entering a trade
+    - exit_conditions: List of conditions for exiting a trade
+    - risk_management: List of risk management rules
+    
+    The keys file should contain the following keys:
+    - api_key: Alpaca API key for paper trading
+    - api_secret: Alpaca API secret for paper trading
+    """
+    def __init__(self, config: Dict[str, Any], keys: Dict[str, str]):
+        self.config = config
+        self.keys = keys
         self.positions = []
         self.indicators: Dict[str, Callable] = {}
         self.entry_conditions: List[Callable] = []
         self.exit_conditions: List[Callable] = []
-        self.risk_filters: List[Callable] = []
+        self.risk_management: List[Callable] = []
         self.position_sizing: Optional[Callable] = None
+        self.df = pd.DataFrame()
+        self.trades = pd.DataFrame()
+        self.equity = pd.Series()
+        self.metrics = {}   
+        self.indicators = self.get_indicators()
         
-        # Initialize indicator map
-        self.indicator_map = {
-            'sma': self._calculate_sma,
-            'ema': self._calculate_ema,
-            'wma': self._calculate_wma,
-            'hull_ma': self._calculate_hull_ma,
-            'rsi': self._calculate_rsi,
-            'macd': self._calculate_macd,
-            'bollinger_bands': self._calculate_bollinger_bands,
-            'keltner_channels': self._calculate_keltner_channels,
-            'atr': self._calculate_atr,
-            'stochastic': self._calculate_stochastic,
-            'roc': self._calculate_roc,
-            'momentum': self._calculate_momentum,
-            'williams_r': self._calculate_williams_r,
-            'adx': self._calculate_adx,
-            'cci': self._calculate_cci,
-            'obv': self._calculate_obv,
-            'vwap': self._calculate_vwap,
-            'mfi': self._calculate_mfi,
-            'fibonacci': self._calculate_fibonacci_levels
-        }
-        
-        # Initialize indicators from parameters
-        if 'indicators' in parameters:
-            for name, indicator_config in parameters['indicators'].items():
-                indicator_type = indicator_config['type']
-                if indicator_type in self.indicator_map:
-                    indicator_params = {k: v for k, v in indicator_config.items() if k != 'type'}
-                    
-                    def make_indicator(indicator_func, fixed_params):
-                        def indicator(df):
-                            return indicator_func(df, period=fixed_params.get('period'))
-                        return indicator
-                    
-                    self.indicators[name] = make_indicator(
-                        self.indicator_map[indicator_type], 
-                        indicator_params
-                    )
 
-            print(self.indicators)
-                    
-    def add_indicator(self, name: str, calculation_func: Callable):
-        """Add a technical indicator"""
-        self.indicators[name] = calculation_func
-        
-    def add_entry_condition(self, condition_func: Callable):
-        """Add entry condition"""
-        self.entry_conditions.append(condition_func)
-        
-    def add_exit_condition(self, condition_func: Callable):
-        """Add exit condition"""
-        self.exit_conditions.append(condition_func)
-        
-    def add_risk_filter(self, filter_func: Callable):
-        """Add risk management filter"""
-        self.risk_filters.append(filter_func)
-        
-    def set_position_sizing(self, sizing_func: Callable):
-        """Set position sizing function"""
-        self.position_sizing = sizing_func
+    def get_indicators(self):
+        '''
+        Parse through list of indicators in the config
+        '''
+        for indicator in self.config['indicators']:
+            # Use the indicator + period value to instantiate pd.Series 
+            # for EMA SMA calculations
+            # Else:  
+            if indicator['name'].lower() in ['ema', 'sma']:
+                key = f"{indicator['name'].lower()}_{str(indicator['params'].get('period'))}"
+                self.indicators[key] = indicator['params']
+            else:
+                self.indicators[indicator['name'].lower()] = indicator['params']
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        """Generate trading signals"""
-        signals = pd.Series(0, index=data.index)
-        
-        try:
-            # Convert single DataFrame to dict format
-            data_dict = {self.parameters.get('symbol', 'default'): data}
-            market_condition = self.parameters.get('market_condition', {'risk_level': 'medium'})
-            
-            # Generate detailed signals
-            detailed_signals = self._generate_detailed_signals(data_dict, market_condition)
-            
-            # Convert detailed signals to simple signal series (-1, 0, 1)
-            if detailed_signals:
-                for signal in detailed_signals:
-                    if signal.timestamp in signals.index:
-                        signals[signal.timestamp] = 1 if signal.direction == 'buy' else -1 if signal.direction == 'sell' else 0
-                
-        except Exception as e:
-            print(f"Error in generate_signals: {e}")
-            
-        return signals.fillna(0)
-
-    def _generate_detailed_signals(self, data: Dict[str, pd.DataFrame], market_condition: Dict) -> List[Signal]:
+        return self.indicators
+    
+    def get_risk_management(self):
+        '''
+        Parse through list of risk management strategies in the config
+        '''
+        for risk in self.config['risk_management']:
+            self.risk_management.append(risk)
+        return self.risk_management
+    
+    def get_data(self) -> pd.DataFrame:
         """
-        Generate detailed trading signals using multi-factor analysis.
-        
-        Args:
-            data: Dictionary of symbol to DataFrame mappings
-            market_condition: Dictionary containing market condition parameters
-            
-        Returns:
-            List of Signal objects containing trade details
+        Fetch data from the Alpaca API
         """
-        signals = []
-        
-        for symbol, df in data.items():
-            try:
-                # Calculate indicators
-                indicators = self._calculate_indicators(df)
-                
-                # Check risk filters
-                if not self._pass_risk_filters(df, indicators, market_condition):
-                    continue
-                
-                # Generate signal
-                signal = self._evaluate_conditions(symbol, df, indicators, market_condition)
-                if signal:
-                    signals.append(signal)
-                    
-            except Exception as e:
-                print(f"Error generating signal for {symbol}: {e}")
-                
-        return signals
+        cfg = self.config
+        data_manager = AlpacaDataFetcher(self.keys['api_key'], 
+                                            self.keys['api_secret'])
 
-    def _calculate_indicators(self, df: pd.DataFrame) -> Dict:
-        """
-        Calculate all technical indicators defined in the strategy.
-        
-        Args:
-            df: DataFrame with OHLCV data
+        print("Getting data for these symbols: ", cfg['symbols'])
+        data_list = []
+        for symbol in cfg['symbols']:
+            data = data_manager.get_historical_data(
+                symbol, 
+                cfg['timeframe'],
+                datetime.strptime(cfg['start_date'], "%Y-%m-%d"),
+                datetime.strptime(cfg['end_date'], "%Y-%m-%d")
+                )
             
-        Returns:
-            Dictionary mapping indicator names to their calculated values
+            data_list.append(data)
+        
+        df = pd.concat(data_list)
+        
+        self.df = self.calculate_indicators(df)
+        self.df.reset_index(inplace=True)
+        print(self.df.head())
+        return self.df
+    
+    def get_keys(self):
+        return self.keys
+    
+    def get_config(self):
+        return self.config
+
+    def calculate_indicators(self, df:pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate all required indicators for the strategy
         """
         try:
-            print(df.head())
-            for n, f in self.indicators.items():
-                print(n, f) 
-            return {
-                
-                name: func(df) for name, func in self.indicators.items()
-            }
-        except Exception as e:
-            print(f"Error calculating indicators: {e}")
-            return {}
+            technicals = TechnicalIndicators(df, self.indicators)
+            self.df = technicals.calculate_indicators()
 
-    def _pass_risk_filters(self, df: pd.DataFrame, indicators: Dict, market_condition: Dict) -> bool:
+        except: 
+            Exception("Error calculating indicators")
+        return self.df
+
+    
+    def _check_condition(self, row: pd.Series, condition_config: Dict) -> bool:
         """
-        Check if all risk filters pass.
+        Checking the entry / exit condition for a given row
+        """
+        
+        comparison_values = ['above', 'below', 'between', 'crosses_above', 'crosses_below']
+        if condition_config['comparison'] not in comparison_values:
+            raise Exception(f"Comparison value {condition_config['comparison']} not a valid comparison operator" )
+
+        indicator = condition_config['indicator']
+        comparison = condition_config['comparison']
+        value = condition_config['value']
+        
+        # Value can be either a number or another indicator
+        if (comparison == "above") & isinstance(value, str) :
+            above = row[indicator.lower()] > row[value.lower()]
+            return above
+        elif (comparison == "above") & isinstance(value, (int, float)):
+            above = row[indicator.lower()] > value
+            return above
+
+        # Value can be either a number or another indicator
+        if (comparison == "below") & isinstance(value, str) :
+            below = row[indicator.lower()] < row[value.lower()]
+            return below
+        elif (comparison == "below") & isinstance(value, int):
+            below = row[indicator.lower()] < value
+            return below
+
+        if comparison == "crosses_above":
+            if indicator == "MACD":
+                macd_cross_above = (row['macd'] > row['macd_signal']) & (row['macd_prev'] <= row['macdsignal_prev'])
+                return macd_cross_above
+            elif indicator == "BBANDS":
+                bb_cross_above = (row['close'] > row[value.lower()]) & (row['close_prev'] <= row[value.lower()])
+                return bb_cross_above
+            else:
+                if isinstance(value, str):
+                    indicator_cross_above = (row[indicator.lower()] > row[value.lower()]) & (row[f"{indicator.lower()}_prev"] <= row[f"{value.lower()}_prev"])
+                    return indicator_cross_above
+                elif isinstance(value, (int, float)):
+                    indicator_cross_above = (row[indicator.lower()] > value) & (row[f"{indicator.lower()}_prev"] <= value)
+                    return indicator_cross_above
+                return indicator_cross_above
+            
+        elif comparison == "crosses_below":
+            if indicator == "MACD":
+                macd_cross_below = (row['macd'] < row['macd_signal']) & (row['macd_prev'] >= row['macdsignal_prev'])
+                return macd_cross_below
+
+            elif indicator == "BBANDS":
+                bb_cross_below = (row['close'] < row[value]) & (row['close_prev'] >= row[value])
+                return bb_cross_below
+            else:
+                indicator_cross_below = (row[indicator.lower()] < row[value.lower()]) & (row[f"{indicator.lower()}_prev"] >= row[f"{value.lower()}_prev"])
+                return indicator_cross_below
+            
+        elif indicator == 'between':
+            if any(isinstance(x, (int, float)) for x in value):
+                indicator_between = row.between(value[0], value[1], inclusive="both")
+                return indicator_between
+            else:
+                indicator_between = row.between(row[value[0]], row[value[1]], inclusive="both")
+                return indicator_between
+
+    def _check_entry_conditions(self, row: pd.Series) -> bool:
+        """Check if all entry conditions are met"""
+        return all(
+            self._check_condition(row, condition)
+            for condition in self.config['entry_conditions']
+        )
+
+    def _check_exit_conditions(self, row: pd.Series) -> bool:
+        """Check if any exit condition is met"""
+        return any(
+            self._check_condition(row, condition)
+            for condition in self.config['exit_conditions']
+        )
+
+    def _calculate_position_size(self, row: pd.Series, account_balance: float) -> float:
+        """
+        Calculate position size based on risk management rules, ensuring non-negative position sizes
         
         Args:
-            df: DataFrame with OHLCV data
-            indicators: Dictionary of calculated indicators
-            market_condition: Dictionary containing market condition parameters
+            row: DataFrame row containing price and indicator data
+            account_balance: Current account balance
+            
             
         Returns:
-            Boolean indicating if all risk filters pass
+            float: Calculated position size, always >= 0
         """
-        if not self.risk_filters:
-            return True
-            
         try:
-            return all(
-                filter_func(df, indicators, market_condition)
-                for filter_func in self.risk_filters
-            )
+            # Ensure account balance is positive
+            account_balance = abs(account_balance)
+            risk_config = self.config['risk_management']
+            if ['position_sizing_method'] == 'atr_based':
+                # Make sure ATR exists and is not NaN
+                if 'atr' not in row or pd.isna(row['atr']):
+                    print(f"Warning: ATR is missing or NaN. Available columns: {row.index.tolist()}")
+                    return 0.0
+                    
+                risk_amount = account_balance * abs(risk_config['risk_per_trade'])
+                stop_distance = abs(float(row['atr'])) * abs(risk_config['atr_multiplier'])
+                
+                # Avoid division by zero and ensure positive stop distance
+                if stop_distance <= 0:
+                    print(f"Warning: Invalid stop distance calculated: {stop_distance}")
+                    return 0.0
+                    
+                position_size = risk_amount / stop_distance
+                max_position_size = abs(risk_config['max_position_size'])
+                
+                print(f"""
+    Position Size Calculation:
+    - Account Balance: {account_balance}
+    - Risk Amount: {risk_amount}
+    - ATR: {abs(row['atr'])}
+    - Stop Distance: {stop_distance}
+    - Calculated Position Size: {position_size}
+    - Max Position Size: {max_position_size}
+                """)
+                
+                return min(position_size, max_position_size)
+                
+            elif risk_config['position_sizing_method'] == 'fixed':
+                return abs(risk_config['max_position_size'])
+            
+            elif risk_config['position_sizing_method'] == 'risk_based':
+                risk_amount = account_balance * abs(risk_config['risk_per_trade'])
+                stop_distance = abs(row['close']) * abs(risk_config['stop_loss'])
+                
+                if stop_distance <= 0:
+                    print(f"Warning: Invalid stop distance calculated: {stop_distance}")
+                    return 0.0
+                    
+                position_size = risk_amount / stop_distance
+                max_position_size = abs(risk_config['max_position_size'])
+                
+                return min(position_size, max_position_size)
+                
+            else:
+                print(f"Warning: Unknown position sizing method: {risk_config['position_sizing_method']}")
+                return 0.0
+                
         except Exception as e:
-            print(f"Error in risk filters: {e}")
+            print(f"Error calculating position size: {str(e)}")
+            print(f"Row data: {row}")
+            return 0.0
+
+    def _calculate_pnl(self, entry_price: float, exit_price: float, position_size: float) -> float:
+        """Calculate PnL for a trade with validation"""
+        try:
+            if any(pd.isna([entry_price, exit_price, position_size])):
+                print(f"""
+    Invalid PnL calculation values:
+    - Entry Price: {entry_price}
+    - Exit Price: {exit_price}
+    - Position Size: {position_size}
+                """)
+                return 0.0
+                
+            pnl = (exit_price - entry_price) * position_size
+            return pnl
+            
+        except Exception as e:
+            print(f"Error calculating PnL: {str(e)}")
+            return 0.0
+
+    def _check_stop_loss(self, row: pd.Series, entry_price, position) -> bool:
+        """Check if stop loss is hit"""
+        risk_config = self.config['risk_management']
+        if not position:
             return False
+        return row['close'] <= entry_price * (1 - risk_config['stop_loss'])
 
-    def _evaluate_conditions(self, symbol: str, df: pd.DataFrame, indicators: Dict, market_condition: Dict) -> Optional[Signal]:
-        """
-        Evaluate entry and exit conditions to generate trading signal.
-        
-        Args:
-            symbol: Trading symbol
-            df: DataFrame with OHLCV data
-            indicators: Dictionary of calculated indicators
-            market_condition: Dictionary containing market condition parameters
-            
-        Returns:
-            Signal object if conditions are met, None otherwise
-        """
-        try:
-            # Check entry conditions
-            entry_strength = self._check_conditions(
-                df, indicators, market_condition, self.entry_conditions
-            )
-            
-            # Check exit conditions
-            exit_strength = self._check_conditions(
-                df, indicators, market_condition, self.exit_conditions
-            )
-            
-            # Generate signal based on condition strengths
-            if entry_strength > 0.5 and entry_strength > exit_strength:
-                return self._create_signal(symbol, df, 'buy', entry_strength, indicators)
-            elif exit_strength > 0.5:
-                return self._create_signal(symbol, df, 'sell', exit_strength, indicators)
-                
-            return None
-        except Exception as e:
-            print(f"Error evaluating conditions: {e}")
-            return None
+    def _check_take_profit(self, row: pd.Series, entry_price, position) -> bool:
+        """Check if take profit is hit"""
+        risk_config = self.config['risk_management']
+        if not position:
+            return False
+        return row['close'] >= entry_price * (1 + risk_config['take_profit'])
 
-    def _check_conditions(self, df: pd.DataFrame, indicators: Dict, market_condition: Dict, conditions: List[Callable]) -> float:
-        """
-        Check conditions and return average strength.
-        
-        Args:
-            df: DataFrame with OHLCV data
-            indicators: Dictionary of calculated indicators
-            market_condition: Dictionary containing market condition parameters
-            conditions: List of condition functions to check
-            
-        Returns:
-            Float between 0 and 1 indicating average condition strength
-        """
-        if not conditions:
-            return 0
-            
-        try:
-            strengths = [
-                condition(df, indicators, market_condition)
-                for condition in conditions
-            ]
-            
-            return sum(strengths) / len(strengths)
-        except Exception as e:
-            print(f"Error checking conditions: {e}")
-            return 0
-
-    def _create_signal(self, symbol: str, df: pd.DataFrame, direction: str, strength: float, indicators: Dict) -> Signal:
-        """
-        Create a trading signal with stop loss and take profit levels.
-        
-        Args:
-            symbol: Trading symbol
-            df: DataFrame with OHLCV data
-            direction: Trade direction ('buy' or 'sell')
-            strength: Signal strength between 0 and 1
-            indicators: Dictionary of calculated indicators
-            
-        Returns:
-            Signal object with trade details
-        """
-        try:
-            current_price = df['close'].iloc[-1]
-            atr = self._calculate_atr(df)
-            
-            # Calculate stop loss and take profit based on ATR
-            if direction == 'buy':
-                stop_loss = current_price - 2 * atr
-                take_profit = current_price + 3 * atr
-            else:
-                stop_loss = current_price + 2 * atr
-                take_profit = current_price - 3 * atr
-            
-            return Signal(
-                symbol=symbol,
-                timestamp=df.index[-1],
-                direction=direction,
-                strength=strength,
-                trade_type='entry',
-                price=current_price,
-                stop_loss=stop_loss,
-                take_profit=take_profit,
-                metadata={
-                    'indicators': indicators,
-                    'atr': atr
+    def _calculate_metrics(self, trades: pd.DataFrame, equity: pd.Series, initial_balance: float) -> Dict[str, float]:
+            """Calculate backtest performance metrics"""
+            if len(trades) == 0:
+                return {
+                    "total_trades": 0,
+                    "win_rate": 0,
+                    "profit_factor": 0,
+                    "total_return": 0,
+                    "max_drawdown": 0,
+                    "sharpe_ratio": 0
                 }
-            )
-        except Exception as e:
-            print(f"Error creating signal: {e}")
-            return None
-        
-    # TECHNICAL INDICATORS
-
-    def _calculate_sma(df: pd.DataFrame, sma_period: int = 20) -> pd.Series:
-        """Calculate Simple Moving Average"""
-        return df['close'].rolling(window=sma_period).mean()
-
-    def _calculate_ema(df: pd.DataFrame, period: int = 20) -> pd.Series:
-        """Calculate Exponential Moving Average"""
-        return df['close'].ewm(span=period, adjust=False).mean()
-
-    @staticmethod
-    def _calculate_wma(df: pd.DataFrame, period: int = 20) -> pd.Series:
-        """Calculate Weighted Moving Average"""
-        weights = np.arange(1, period + 1)
-        return df['close'].rolling(period).apply(lambda x: np.dot(x, weights) / weights.sum())
-
-    @staticmethod
-    def _calculate_hull_ma(df: pd.DataFrame, period: int = 20) -> pd.Series:
-        """
-        Calculate Hull Moving Average
-        HMA = WMA(2*WMA(n/2) - WMA(n)), sqrt(n))
-        """
-        half_period = int(period/2)
-        sqrt_period = int(np.sqrt(period))
-        
-        wma1 = _calculate_wma(df, half_period)
-        wma2 = _calculate_wma(df, period)
-        return _calculate_wma(pd.DataFrame({'close': 2*wma1 - wma2}), sqrt_period)
-
-    def _calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Relative Strength Index"""
-        delta = df['close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        return 100 - (100 / (1 + rs))
-
-    def _calculate_macd(df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """Calculate MACD, Signal line, and MACD histogram"""
-        exp1 = df['close'].ewm(span=fast, adjust=False).mean()
-        exp2 = df['close'].ewm(span=slow, adjust=False).mean()
-        macd_line = exp1 - exp2
-        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
-        histogram = macd_line - signal_line
-        return macd_line, signal_line, histogram
-
-    def _calculate_bollinger_bands(df: pd.DataFrame, period: int = 20, std: float = 2) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """Calculate Bollinger Bands"""
-        middle = df['close'].rolling(window=period).mean()
-        std_dev = df['close'].rolling(window=period).std()
-        upper = middle + std * std_dev
-        lower = middle - std * std_dev
-        return upper, middle, lower
-
-    def _calculate_keltner_channels(df: pd.DataFrame, period: int = 20, atr_mult: float = 2) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """Calculate Keltner Channels"""
-        typical_price = (df['high'] + df['low'] + df['close']) / 3
-        middle = typical_price.rolling(window=period).mean()
-        atr = calculate_atr(df, period)
-        
-        upper = middle + (atr_mult * atr)
-        lower = middle - (atr_mult * atr)
-        return upper, middle, lower
-
-    @staticmethod
-    def _calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Average True Range"""
-        high = df['high']
-        low = df['low']
-        close = df['close'].shift()
-        
-        tr1 = high - low
-        tr2 = abs(high - close)
-        tr3 = abs(low - close)
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        
-        return tr.rolling(window=period).mean()
-
-    def _calculate_stochastic(df: pd.DataFrame, k_period: int = 14, d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
-        """Calculate Stochastic Oscillator"""
-        low_min = df['low'].rolling(window=k_period).min()
-        high_max = df['high'].rolling(window=k_period).max()
-        
-        k = 100 * (df['close'] - low_min) / (high_max - low_min)
-        d = k.rolling(window=d_period).mean()
-        return k, d
-
-    def _calculate_roc(df: pd.DataFrame, period: int = 12) -> pd.Series:
-        """Calculate Rate of Change"""
-        return (df['close'] - df['close'].shift(period)) / df['close'].shift(period) * 100
-
-    def _calculate_momentum(df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Momentum"""
-        return df['close'] - df['close'].shift(period)
-
-    def _calculate_williams_r(df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Williams %R"""
-        highest_high = df['high'].rolling(window=period).max()
-        lowest_low = df['low'].rolling(window=period).min()
-        wr = (highest_high - df['close']) / (highest_high - lowest_low) * -100
-        return wr
-
-    def _calculate_adx(df: pd.DataFrame, period: int = 14) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """Calculate Average Directional Index (ADX)"""
-        high = df['high']
-        low = df['low']
-        close = df['close']
-        
-        # Calculate True Range
-        tr1 = high - low
-        tr2 = abs(high - close.shift())
-        tr3 = abs(low - close.shift())
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        atr = tr.rolling(window=period).mean()
-        
-        # Calculate Plus and Minus Directional Movement
-        up_move = high - high.shift()
-        down_move = low.shift() - low
-        
-        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
-        minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
-        
-        # Calculate Plus and Minus Directional Indicators
-        plus_di = 100 * pd.Series(plus_dm).rolling(window=period).mean() / atr
-        minus_di = 100 * pd.Series(minus_dm).rolling(window=period).mean() / atr
-        
-        # Calculate ADX
-        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
-        adx = dx.rolling(window=period).mean()
-        
-        return adx, plus_di, minus_di
-
-    def _calculate_cci(df: pd.DataFrame, period: int = 20) -> pd.Series:
-        """Calculate Commodity Channel Index"""
-        tp = (df['high'] + df['low'] + df['close']) / 3
-        tp_sma = tp.rolling(window=period).mean()
-        mad = tp.rolling(window=period).apply(lambda x: pd.Series(x).mad())
-        cci = (tp - tp_sma) / (0.015 * mad)
-        return cci
-
-    def _calculate_obv(df: pd.DataFrame) -> pd.Series:
-        """Calculate On-Balance Volume"""
-        obv = pd.Series(0, index=df.index)
-        obv.iloc[0] = df['volume'].iloc[0]
-        
-        for i in range(1, len(df)):
-            if df['close'].iloc[i] > df['close'].iloc[i-1]:
-                obv.iloc[i] = obv.iloc[i-1] + df['volume'].iloc[i]
-            elif df['close'].iloc[i] < df['close'].iloc[i-1]:
-                obv.iloc[i] = obv.iloc[i-1] - df['volume'].iloc[i]
-            else:
-                obv.iloc[i] = obv.iloc[i-1]
-        
-        return obv
-
-    def _calculate_vwap(df: pd.DataFrame) -> pd.Series:
-        """Calculate Volume Weighted Average Price"""
-        typical_price = (df['high'] + df['low'] + df['close']) / 3
-        return (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
-
-    def _calculate_mfi(df: pd.DataFrame, period: int = 14) -> pd.Series:
-        """Calculate Money Flow Index"""
-        typical_price = (df['high'] + df['low'] + df['close']) / 3
-        money_flow = typical_price * df['volume']
-        
-        positive_flow = pd.Series(0, index=df.index)
-        negative_flow = pd.Series(0, index=df.index)
-        
-        # Calculate positive and negative money flow
-        for i in range(1, len(df)):
-            if typical_price[i] > typical_price[i-1]:
-                positive_flow[i] = money_flow[i]
-            else:
-                negative_flow[i] = money_flow[i]
-        
-        positive_mf = positive_flow.rolling(window=period).sum()
-        negative_mf = negative_flow.rolling(window=period).sum()
-        
-        mfi = 100 - (100 / (1 + positive_mf / negative_mf))
-        return mfi
-
-    def _calculate_fibonacci_levels(df: pd.DataFrame, period: int = 20) -> Dict[str, pd.Series]:
-        """Calculate Fibonacci Retracement Levels"""
-        high = df['high'].rolling(window=period).max()
-        low = df['low'].rolling(window=period).min()
-        diff = high - low
-        
-        return {
-            'level_0': high,
-            'level_236': high - diff * 0.236,
-            'level_382': high - diff * 0.382,
-            'level_500': high - diff * 0.500,
-            'level_618': high - diff * 0.618,
-            'level_100': low
-        }
+            
+            # Calculate returns and drawdown
+            returns = equity.pct_change().dropna()
+            drawdown = (equity - equity.cummax()) / equity.cummax()
+            
+            # Calculate trade metrics
+            winning_trades = trades[trades['pnl'] > 0]
+            losing_trades = trades[trades['pnl'] <= 0]
+            
+            metrics = {
+                "total_trades": len(trades),
+                "winning_trades": len(winning_trades),
+                "losing_trades": len(losing_trades),
+                "win_rate": round(len(winning_trades) / len(trades), 2),
+                "profit_factor": round(abs(winning_trades['pnl'].sum() / losing_trades['pnl'].sum()) if len(losing_trades) > 0 else float('inf'),2),
+                "total_return":round((equity.iloc[-1] - initial_balance) / initial_balance, 2),
+                "max_drawdown": round(abs(drawdown.min()), 4),
+                "sharpe_ratio": round(np.sqrt(252) * returns.mean() / returns.std() if len(returns) > 0 else 0, 2)
+            }
+            
+            return metrics
