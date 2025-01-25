@@ -1,0 +1,72 @@
+symbol: "PLTR"
+
+# Stage 1 (Accumulation) conditions
+stage1_conditions:
+  # Using actual Bollinger Band values
+  - indicator: "close"
+    comparison: "between"
+    value: ["lowerband", "upperband"]  # Price within bands
+  - indicator: "close"
+    comparison: "between"
+    value: ["sma_20", "sma_50"]  # Price contained between MAs
+  - indicator: "rsi"
+    comparison: "between"
+    value: [40, 60]  # RSI showing neutral momentum
+  - indicator: "atr"
+    comparison: "below"
+    value:  1000 # Below average ATR indicates lower volatility
+
+# Stage 2 (Markup) entry conditions
+entry_conditions:
+  - indicator: "close"
+    comparison: "above"
+    value: "sma_20"
+  - indicator: "ema_5"
+    comparison: "crosses_above"
+    value: "sma_20"
+
+
+
+# Stage 4 (Markdown) exit conditions
+exit_conditions:
+  - indicator: "close"
+    comparison: "below"
+    value: "ema_20"
+  - indicator: "ema_5"
+    comparison: "crosses_below"
+    value: "ema_20"
+  # Price breaking below bands
+  - indicator: "close"
+    comparison: "below"
+    value: "lowerband"
+
+# Risk management parameters
+risk_management:
+  position_sizing_method: "risk_based"
+  risk_per_trade: 0.7
+  stop_loss: 0.02
+  take_profit: 0.06
+  max_position_size: 1000.0
+  atr_multiplier: 2.0
+
+# Required indicators for all stages
+indicators:
+  - name: "EMA"
+    params:
+      period: 5
+  - name: "SMA"
+    params:
+      period: 20
+  - name: "SMA"
+    params:
+      period: 50
+  - name: "RSI"
+    params:
+      period: 14
+  - name: "BBANDS"
+    params:
+      period: 20
+      std_dev: 2
+  - name: "ATR"
+    params:
+      period: 14

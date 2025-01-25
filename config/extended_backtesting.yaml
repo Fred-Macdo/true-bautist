@@ -52,6 +52,19 @@ strategies:
       std_dev: 2
       mean_reversion: true
 
+  ichimoku_test:
+    type: IchimokuStrategy
+    enabled: true
+    symbols:
+      - NVDA
+      - PLTR
+      - NIO
+    parameters:
+      conversion_period: 9
+      base_period: 26
+      span_period: 52
+
+
 # Portfolio Configuration
 portfolio:
   initial_capital: 100000
