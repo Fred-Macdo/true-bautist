@@ -1,0 +1,66 @@
+# Universe
+symbols: ["PLTR", "SOFI", "HIMS"]
+timeframe: "1D" # (M)INUTE, (H)OUR, (D)AY
+start_date: "2024-01-01" # YYYY-MM-DD
+end_date: "2024-12-31" # YYYY-MM-DD
+
+# TECHNICAL INDICATORS
+indicators:
+  - name: "EMA"
+    params:
+      period: 5
+  - name: "EMA"
+    params:
+      period: 20
+  - name: "SMA"
+    params:
+      period: 20
+  - name: "SMA"
+    params:
+      period: 50
+  - name: "RSI"
+    params:
+      period: 14
+  - name: "BBANDS"
+    params:
+      period: 20
+      std_dev: 2
+  - name: "ATR"
+    params:
+      period: 14
+
+# CONDITIONS
+# BASED ON AN INDICATOR-COLUMN (CAN BE ANY COLUMN, MOVING AVERAGE INDICATOR COLUMNS HAVE '_20', '_5' SUFFIX),
+# A COMPARISON (ABOVE, BELOW, CROSSES_ABOVE, CROSSES_BELOW, BETWEEN),
+# AND A VALUE, CAN BE EITHER A NUMERICAL VALUE, OR ANOTHER COLUMN / INDICATOR-COLUMN
+
+# ENTRY CONDITIONS
+entry_conditions:
+  - indicator: "close"
+    comparison: "above"
+    value: "sma_20"
+  - indicator: "ema_5"
+    comparison: "crosses_above"
+    value: "sma_20"
+
+# EXIT CONDITIONS
+exit_conditions:
+  - indicator: "close"
+    comparison: "below"
+    value: "ema_20"
+  - indicator: "ema_5"
+    comparison: "crosses_below"
+    value: "ema_20"
+  # Price breaking below bands
+  - indicator: "close"
+    comparison: "below"
+    value: "lowerband"
+
+# RISK MANAGEMENT
+risk_management:
+  position_sizing_method: "risk_based" 
+  risk_per_trade: 0.25 # PERCENTAGE
+  stop_loss: 0.08 # PERCENTAGE
+  take_profit: 0.2 # PERCENTAGE
+  max_position_size: 1000.0
+  atr_multiplier: 2.0
