@@ -73,7 +73,7 @@ exit_conditions:
 
 - Finally, tweak the risk-management framework which will help you protect your assets during trading. **NOTE:** `risk_per_trade`, `stop_loss`, and `take_profit` are expressed as percents.
 
-### **3. Run the backtest using the --backtest flag. **
+### **3. Run the backtest using the --backtest flag.**
 
 `python true_bautist.py -c <configuration.yaml> -k <api_keys.yaml>`
 
