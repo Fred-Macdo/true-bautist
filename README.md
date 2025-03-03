@@ -2,15 +2,15 @@
 
 Being a fucking donkey is hard but fortunately for you I am here to help. I built this buggy little application to help you algo-trade your way into insolvency, destitution and divorce or by some infinitesimal chance, wealth accumulation. I was sober for much of the development period but none of the testing (I didn't test) so expect some shit to go awry and deal with it. Leveraging a great open-source framework called Lumibot as a back-end engine, I hacked together a configuration file-based system that allows noob algo-traders to develop their own strategies. "Traders" can identify *stocks* to trade,  select own *indicators* to track, specify *entry/exit conditions* for their positions and set *risk-management* guardrails for their trades.
 
-### How do I use the True Bautist?
+## How do I use the True Bautist?
 
 I did most of the work for you already so all you need to do is follow a few steps to get this thing working.
 
-1. Clone the repo:
+###**1. Clone the repo:**
 
 `git clone https://github.com/Fred-Macdo/true-bautist.git`
 
-2. Edit your config file:
+###**2. Edit your config file:**
 
 - Start with the trading universe or overall configurations.
 
@@ -73,7 +73,7 @@ exit_conditions:
 
 - Finally, tweak the risk-management framework which will help you protect your assets during trading. **NOTE:** `risk_per_trade`, `stop_loss`, and `take_profit` are expressed as percents.
 
-3. Run the backtest using the --backtest flag. 
+###**3. Run the backtest using the --backtest flag. **
 
 `python true_bautist.py -c <configuration.yaml> -k <api_keys.yaml>`
 
