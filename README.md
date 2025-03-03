@@ -1,15 +1,14 @@
 # True Bautist - A [Lumibot](https://github.com/Lumiwealth/lumibot) Adaptation
 
-Being a fucking donkey is hard but fortunately for you I am here to help. I built this buggy little application to help you algo-trade your way into insolvency, destitution and divorce or by some infinitesimal chance, wealth accumulation. I was sober for much of the development period but none of the testing (I didn't test) so expect some shit to go awry and deal with it. Leveraging a great open-source framework called Lumibot as a back-end engine, I hacked together a configuration file-based system that allows noob algo-traders to develop their own strategies. "Traders" can identify *stocks* to trade,  select own *indicators* to track, , specify *entry/exit conditions* for their positions and set *risk-management* guardrails for their trades.
+Being a fucking donkey is hard but fortunately for you I am here to help. I built this buggy little application to help you algo-trade your way into insolvency, destitution and divorce or by some infinitesimal chance, wealth accumulation. I was sober for much of the development period but none of the testing (I didn't test) so expect some shit to go awry and deal with it. Leveraging a great open-source framework called Lumibot as a back-end engine, I hacked together a configuration file-based system that allows noob algo-traders to develop their own strategies. "Traders" can identify *stocks* to trade,  select own *indicators* to track, specify *entry/exit conditions* for their positions and set *risk-management* guardrails for their trades.
 
 ### How do I use the True Bautist?
 
 I did most of the work for you already so all you need to do is follow a few steps to get this thing working.
 
 1. Clone the repo:
-`git clone https://github.com/Fred-Macdo/true-bautist.git
 
-`
+`git clone https://github.com/Fred-Macdo/true-bautist.git`
 
 2. Edit your config file:
 
