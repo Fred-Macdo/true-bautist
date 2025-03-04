@@ -2,6 +2,21 @@
 
 Being a fucking donkey is hard but fortunately for you I am here to help. I built this buggy little application to help you algo-trade your way into insolvency, destitution and divorce or by some infinitesimal chance, wealth accumulation. I was sober for much of the development period but none of the testing (I didn't test) so expect some shit to go awry and deal with it. Leveraging a great open-source framework called Lumibot as a back-end engine, I hacked together a configuration file-based system that allows noob algo-traders to develop their own strategies. "Traders" can identify *stocks* to trade,  select own *indicators* to track, specify *entry/exit conditions* for their positions and set *risk-management* guardrails for their trades.
 
+## Installation
+
+Mac OS / Linux
+
+`pip install -r requirements.txt`
+
+Windows (Godspeed)
+
+Install the msi for TA-Lib, a technical analysis library, then run msiexec from the command line. 
+
+[Technical Analysis Library Github](https://github.com/ta-lib/ta-lib-python#windows
+
+Then run the requirements.txt.
+`pip install -r requirements.txt`
+
 ## How do I use the True Bautist?
 
 I did most of the work for you already so all you need to do is follow a few steps to get this thing working.
