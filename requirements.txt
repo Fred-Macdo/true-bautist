@@ -2,3 +2,4 @@ lumibot
 TA-Lib
 numpy
 pandas
+yaml
