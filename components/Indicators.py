@@ -24,7 +24,8 @@ class TechnicalIndicators:
             'adx': {'period': 14},
             'obv': {},  # No parameters needed
             'mfi': {'period': 14},
-            'cci': {'period': 20}
+            'cci': {'period': 20},
+            'vwap': {'period': 5}
         }
         
 
@@ -101,6 +102,26 @@ class TechnicalIndicators:
                          self.df.close, 
                          period)
 
+    def calculate_vwap(self, period: int=5) -> pd.Series:
+        """Calculate the Volume-Weighted Average Price"""
+        # Calculate typical price for each row: (high + low + close) / 3
+        typical_price = (self.df['high'] + self.df['low'] + self.df['close']) / 3
+        
+        # Calculate value: typical price * volume
+        value = typical_price * self.df['volume']
+        
+        if period is None:
+            # Calculate cumulative value and cumulative volume (original approach)
+            cumulative_value = value.cumsum()
+            cumulative_volume = self.df['volume'].cumsum()
+        else:
+            # Calculate rolling value and rolling volume over the specified period
+            cumulative_value = value.rolling(window=period).sum()
+            cumulative_volume = self.df['volume'].rolling(window=period).sum()
+        
+        # Calculate VWAP
+        self.df['vwap'] = cumulative_value / cumulative_volume
+
     def calculate_indicators(self):
         """
         Calculate all technical indicators using parameters from self.params
@@ -116,7 +137,8 @@ class TechnicalIndicators:
             'adx': self.calculate_adx,
             'obv': self.calculate_obv,
             'mfi': self.calculate_mfi,
-            'cci': self.calculate_cci
+            'cci': self.calculate_cci,
+            'vwap': self.calculate_vwap
         }
         
         # process the respective moving averages for each n

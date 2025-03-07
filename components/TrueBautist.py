@@ -29,17 +29,20 @@ class TrueBautistStrategy:
     def __init__(self, config: Dict[str, Any], keys: Dict[str, str]):
         self.config = config
         self.keys = keys
-        self.positions = []
-        self.indicators: Dict[str, Callable] = {}
-        self.entry_conditions: List[Callable] = []
-        self.exit_conditions: List[Callable] = []
-        self.risk_management: List[Callable] = []
-        self.position_sizing: Optional[Callable] = None
+        
+        self.risk_management = {}
+        self.indicators = {}
+        self.entry_conditions = []
+        self.exit_conditions = []
+        self.get_risk_management()
+        self.get_indicators()
+        self.get_entry_conditions()
+        self.get_exit_conditions()
+
         self.df = pd.DataFrame()
         self.trades = pd.DataFrame()
         self.equity = pd.Series()
         self.metrics = {}   
-        self.indicators = self.get_indicators()
         
 
     def get_indicators(self):
@@ -62,9 +65,26 @@ class TrueBautistStrategy:
         '''
         Parse through list of risk management strategies in the config
         '''
-        for risk in self.config['risk_management']:
-            self.risk_management.append(risk)
+        for risk_param, param_value in self.config['risk_management'].items():
+            self.risk_management[risk_param] = param_value
         return self.risk_management
+        
+    def get_keys(self):
+        return self.keys
+    
+    def get_config(self):
+        return self.config
+    
+    def get_entry_conditions(self):
+        for condition in self.config['entry_conditions']:
+            self.entry_conditions.append(condition)
+        return self.entry_conditions
+    
+    def get_exit_conditions(self):
+        for condition in self.config['exit_conditions']:
+            self.exit_conditions.append(condition)
+        return self.exit_conditions
+            
     
     def get_data(self) -> pd.DataFrame:
         """
@@ -73,7 +93,6 @@ class TrueBautistStrategy:
         cfg = self.config
         # PAPER / LIVE
 
-        
         if self.keys.get('api_key_paper'):
 
             data_manager = AlpacaDataFetcher(self.keys['api_key_paper'], 
@@ -110,12 +129,6 @@ class TrueBautistStrategy:
         self.df.reset_index(inplace=True)
         self.alpaca_response = response
         return self.df
-    
-    def get_keys(self):
-        return self.keys
-    
-    def get_config(self):
-        return self.config
 
     def calculate_indicators(self, df:pd.DataFrame) -> pd.DataFrame:
         """
@@ -134,188 +147,6 @@ class TrueBautistStrategy:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone(timedelta(hours=-5)))
         return dt
-
-    def _check_condition(self, row: pd.Series, condition_config: Dict) -> bool:
-        """
-        Checking the entry / exit condition for a given row
-        """
-        
-        comparison_values = ['above', 'below', 'between', 'crosses_above', 'crosses_below']
-        if condition_config['comparison'] not in comparison_values:
-            raise Exception(f"Comparison value {condition_config['comparison']} not a valid comparison operator" )
-
-        indicator = condition_config['indicator']
-        comparison = condition_config['comparison']
-        value = condition_config['value']
-        
-        # Value can be either a number or another indicator
-        if (comparison == "above") & isinstance(value, str) :
-            above = row[indicator.lower()] > row[value.lower()]
-            return above
-        elif (comparison == "above") & isinstance(value, (int, float)):
-            above = row[indicator.lower()] > value
-            return above
-
-        # Value can be either a number or another indicator
-        if (comparison == "below") & isinstance(value, str) :
-            below = row[indicator.lower()] < row[value.lower()]
-            return below
-        elif (comparison == "below") & isinstance(value, int):
-            below = row[indicator.lower()] < value
-            return below
-
-        if comparison == "crosses_above":
-            if indicator == "MACD":
-                macd_cross_above = (row['macd'] > row['macd_signal']) & (row['macd_prev'] <= row['macdsignal_prev'])
-                return macd_cross_above
-            elif indicator == "BBANDS":
-                bb_cross_above = (row['close'] > row[value.lower()]) & (row['close_prev'] <= row[value.lower()])
-                return bb_cross_above
-            else:
-                if isinstance(value, str):
-                    indicator_cross_above = (row[indicator.lower()] > row[value.lower()]) & (row[f"{indicator.lower()}_prev"] <= row[f"{value.lower()}_prev"])
-                    return indicator_cross_above
-                elif isinstance(value, (int, float)):
-                    indicator_cross_above = (row[indicator.lower()] > value) & (row[f"{indicator.lower()}_prev"] <= value)
-                    return indicator_cross_above
-                return indicator_cross_above
-            
-        elif comparison == "crosses_below":
-            if indicator == "MACD":
-                macd_cross_below = (row['macd'] < row['macd_signal']) & (row['macd_prev'] >= row['macdsignal_prev'])
-                return macd_cross_below
-
-            elif indicator == "BBANDS":
-                bb_cross_below = (row['close'] < row[value]) & (row['close_prev'] >= row[value])
-                return bb_cross_below
-            else:
-                indicator_cross_below = (row[indicator.lower()] < row[value.lower()]) & (row[f"{indicator.lower()}_prev"] >= row[f"{value.lower()}_prev"])
-                return indicator_cross_below
-            
-        elif indicator == 'between':
-            if any(isinstance(x, (int, float)) for x in value):
-                indicator_between = row.between(value[0], value[1], inclusive="both")
-                return indicator_between
-            else:
-                indicator_between = row.between(row[value[0]], row[value[1]], inclusive="both")
-                return indicator_between
-
-    def _check_entry_conditions(self, row: pd.Series) -> bool:
-        """Check if all entry conditions are met"""
-        return all(
-            self._check_condition(row, condition)
-            for condition in self.config['entry_conditions']
-        )
-
-    def _check_exit_conditions(self, row: pd.Series) -> bool:
-        """Check if any exit condition is met"""
-        return any(
-            self._check_condition(row, condition)
-            for condition in self.config['exit_conditions']
-        )
-
-    def _calculate_position_size(self, row: pd.Series, account_balance: float) -> float:
-        """
-        Calculate position size based on risk management rules, ensuring non-negative position sizes
-        
-        Args:
-            row: DataFrame row containing price and indicator data
-            account_balance: Current account balance
-            
-            
-        Returns:
-            float: Calculated position size, always >= 0
-        """
-        try:
-            # Ensure account balance is positive
-            account_balance = abs(account_balance)
-            risk_config = self.config['risk_management']
-            if ['position_sizing_method'] == 'atr_based':
-                # Make sure ATR exists and is not NaN
-                if 'atr' not in row or pd.isna(row['atr']):
-                    print(f"Warning: ATR is missing or NaN. Available columns: {row.index.tolist()}")
-                    return 0.0
-                    
-                risk_amount = account_balance * abs(risk_config['risk_per_trade'])
-                stop_distance = abs(float(row['atr'])) * abs(risk_config['atr_multiplier'])
-                
-                # Avoid division by zero and ensure positive stop distance
-                if stop_distance <= 0:
-                    print(f"Warning: Invalid stop distance calculated: {stop_distance}")
-                    return 0.0
-                    
-                position_size = risk_amount / stop_distance
-                max_position_size = abs(risk_config['max_position_size'])
-                
-                print(f"""
-    Position Size Calculation:
-    - Account Balance: {account_balance}
-    - Risk Amount: {risk_amount}
-    - ATR: {abs(row['atr'])}
-    - Stop Distance: {stop_distance}
-    - Calculated Position Size: {position_size}
-    - Max Position Size: {max_position_size}
-                """)
-                
-                return min(position_size, max_position_size)
-                
-            elif risk_config['position_sizing_method'] == 'fixed':
-                return abs(risk_config['max_position_size'])
-            
-            elif risk_config['position_sizing_method'] == 'risk_based':
-                risk_amount = account_balance * abs(risk_config['risk_per_trade'])
-                stop_distance = abs(row['close']) * abs(risk_config['stop_loss'])
-                
-                if stop_distance <= 0:
-                    print(f"Warning: Invalid stop distance calculated: {stop_distance}")
-                    return 0.0
-                    
-                position_size = risk_amount / stop_distance
-                max_position_size = abs(risk_config['max_position_size'])
-                
-                return min(position_size, max_position_size)
-                
-            else:
-                print(f"Warning: Unknown position sizing method: {risk_config['position_sizing_method']}")
-                return 0.0
-                
-        except Exception as e:
-            print(f"Error calculating position size: {str(e)}")
-            print(f"Row data: {row}")
-            return 0.0
-
-    def _calculate_pnl(self, entry_price: float, exit_price: float, position_size: float) -> float:
-        """Calculate PnL for a trade with validation"""
-        try:
-            if any(pd.isna([entry_price, exit_price, position_size])):
-                print(f"""
-    Invalid PnL calculation values:
-    - Entry Price: {entry_price}
-    - Exit Price: {exit_price}
-    - Position Size: {position_size}
-                """)
-                return 0.0
-                
-            pnl = (exit_price - entry_price) * position_size
-            return pnl
-            
-        except Exception as e:
-            print(f"Error calculating PnL: {str(e)}")
-            return 0.0
-
-    def _check_stop_loss(self, row: pd.Series, entry_price, position) -> bool:
-        """Check if stop loss is hit"""
-        risk_config = self.config['risk_management']
-        if not position:
-            return False
-        return row['close'] <= entry_price * (1 - risk_config['stop_loss'])
-
-    def _check_take_profit(self, row: pd.Series, entry_price, position) -> bool:
-        """Check if take profit is hit"""
-        risk_config = self.config['risk_management']
-        if not position:
-            return False
-        return row['close'] >= entry_price * (1 + risk_config['take_profit'])
 
     def _calculate_metrics(self, trades: pd.DataFrame, equity: pd.Series, initial_balance: float) -> Dict[str, float]:
             """Calculate backtest performance metrics"""

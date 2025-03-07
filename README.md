@@ -90,6 +90,6 @@ exit_conditions:
 
 ### **3. Run the backtest using the --backtest flag.**
 
-`python true_bautist.py -c <configuration.yaml> -k <api_keys.yaml>`
+`python run_true_bautist.py -c <configuration.yaml> -k <api_keys.yaml>`
 
 **NOTE:** Use the `--live` flag to run your strategy live. In addition you will need to add your `<api_keys.yaml>` after the `configuration.yaml` file while running on the command line. I have set it up for [Alpaca Trading](https://app.alpaca.markets/signup). Alpaca is an API First Brokerage that enables completely free algo trading.
