@@ -1,14 +1,21 @@
+from pickle import TRUE
 from components.TrueBautist import TrueBautistStrategy
 from components.Indicators import TechnicalIndicators
 
 from lumibot.strategies import Strategy
 from lumibot.backtesting import YahooDataBacktesting
+from lumibot.brokers import Alpaca
 
 from datetime import datetime
 import yaml
 import argparse
 import pandas as pd
 from typing import Dict, Union, List, Any
+import numpy as np
+
+# Set consistent formatting options at the beginning of the script
+pd.set_option('display.precision', 2)
+np.set_self.log_messageoptions(precision=2, suppress=True)  # Added suppress=True to avoid scientific notation
 
 
 class YAMLStrategy(Strategy):
@@ -21,7 +28,7 @@ class YAMLStrategy(Strategy):
         self.strategy = true_bautist_config
         self.symbols = true_bautist_config.get_config()['symbols']
         self.timeframe = true_bautist_config.get_config()['timeframe']
-        self.sleeptime = self.timeframe
+        self.sleeptime = "10S"
         self.params = true_bautist_config.indicators
         self.entry_conditions = true_bautist_config.get_config()['entry_conditions']
         self.exit_conditions = true_bautist_config.get_config()['exit_conditions']
@@ -29,13 +36,13 @@ class YAMLStrategy(Strategy):
 
     def before_market_opens(self):
         self.indicators = self.params
-        print("\n")
-        print(f"Date: {self.get_datetime()}",f"Cash Balance: {self.get_cash():.2f}", f"Account Value: {self.get_portfolio_value():.2f}") 
+        self.log_message("\n")
+        self.log_message(f"Date: {self.get_datetime()}", f"Cash Balance: {self.get_cash():.2f}", f"Account Value: {self.get_portfolio_value():.2f}") 
 
     def on_trading_iteration(self):
         cash = self.get_cash()
         positions = self.get_positions()
-        print(f"Date: {self.get_datetime()}, Positions: {positions}" )
+        self.log_message(f"Date: {self.get_datetime()}, Positions: {positions}" )
         if cash <= 0 :
             self.sell_all()
             self.sleep
@@ -55,7 +62,7 @@ class YAMLStrategy(Strategy):
                     if self._check_exit_conditions(df.iloc[-1]):
                         # EVALUATES TO TRUE OR FALSE, IF TRUE SELL ALL
                         self.sell_all(symbol)
-                        print(f"Selling {position.quantity} shares of {symbol}")
+                        self.log_message(f"Selling {position.quantity} shares of {symbol}")
                 
                 else:
                     # CHECK IF ENTRY CONDITIONS EVALUATE TO TRUE; TAKE POSITION
@@ -68,6 +75,8 @@ class YAMLStrategy(Strategy):
                         position_size = risk_amount // price 
                         stop_loss_price = price * (1 - self.risk_management['stop_loss'])
                         take_profit_price = price * (1 + self.risk_management['take_profit'])
+                        stop_loss_price = stop_loss_price.round(2)
+                        take_profit_price = take_profit_price.round(2)
                         # Execute the purchase
                         order = self.create_order(
                             asset=symbol,
@@ -75,13 +84,13 @@ class YAMLStrategy(Strategy):
                             side="buy",
                             take_profit_price=take_profit_price,
                             stop_loss_price=stop_loss_price,
-                            trail_percent=.01,
                             type="bracket"
                         )
-                        print(f"Submitting Order: {symbol}, Position Size: {position_size} \n Total Cost (Approximate): {position_size * df.close.iloc[-1]}")
+                        self.log_message(f"Submitting Order: {symbol}, Position Size: {position_size:.0f}")
+                        self.log_message(f"Total Cost (Approximate): {(position_size * df.close.iloc[-1]):.2f}")
                         
                         self.submit_order(order)   
-        print("*****************************************")
+        self.log_message("*****************************************")
     def on_abrupt_closing(self):
         # Sell all positions
         self.sell_all()
@@ -180,18 +189,38 @@ class YAMLStrategy(Strategy):
         """Check if indicator crosses above a value or another indicator"""
         if isinstance(value, str):
             value_key = value.lower()
-            return (row[indicator_key] > row[value_key]) and (row[f"{indicator_key}_prev"] <= row[f"{value_key}_prev"])
+            evaluation = (row[indicator_key] > row[value_key]) and (row[f"{indicator_key}_prev"] <= row[f"{value_key}_prev"])
+            if evaluation:
+                self.log_message("Crosses above evaluation")
+                self.log_message(f"Current Values: {indicator_key}: {row[indicator_key]:.2f}, {value_key}: {row[value_key]:.2f}")
+                self.log_message(f"Previous values: {indicator_key}_prev: {row[f'{indicator_key}_prev']:.2f}, {value_key}_prev: {row[f'{value_key}_prev']:.2f}")
+            return evaluation
         else:  # int, float
-            return (row[indicator_key] > value) and (row[f"{indicator_key}_prev"] <= value)
+            evaluation = (row[indicator_key] > value) and (row[f"{indicator_key}_prev"] <= value)
+            if evaluation:
+                self.log_message("Crosses above evaluation, numerical value")
+                self.log_message(f"Current Values: {indicator_key}: {row[indicator_key]:.2f}")
+                self.log_message(f"Previous Values: {indicator_key}_prev: {row[f'{indicator_key}_prev']:.2f}, value: {value:.2f}")
+            return evaluation
 
 
     def _check_crosses_below(self, row: pd.Series, indicator_key: str, value: Union[str, int, float]) -> bool:
         """Check if indicator crosses below a value or another indicator"""
         if isinstance(value, str):
             value_key = value.lower()
-            return (row[indicator_key] < row[value_key]) and (row[f"{indicator_key}_prev"] >= row[f"{value_key}_prev"])
+            evaluation = (row[indicator_key] < row[value_key]) and (row[f"{indicator_key}_prev"] >= row[f"{value_key}_prev"])
+            if evaluation:
+                self.log_message("Crosses below evaluation")
+                self.log_message(f"Current Values: {indicator_key}: {row[indicator_key]:.2f}, {value_key}: {row[value_key]:.2f}")
+                self.log_message(f"Previous values: {indicator_key}_prev: {row[f'{indicator_key}_prev']:.2f}, {value_key}_prev: {row[f'{value_key}_prev']:.2f}")
+            return evaluation
         else:  # int, float
-            return (row[indicator_key] < value) and (row[f"{indicator_key}_prev"] >= value)
+            evaluation = (row[indicator_key] < value) and (row[f"{indicator_key}_prev"] >= value)
+            if evaluation:
+                self.log_message("Crosses below evaluation, numerical value")
+                self.log_message(f"Current Values: {indicator_key}: {row[indicator_key]:.2f}")
+                self.log_message(f"Previous Values: {indicator_key}_prev: {row[f'{indicator_key}_prev']:.2f}, value: {value:.2f}")
+            return evaluation
 
 
     def _check_between(self, row: pd.Series, indicator_key: str, value: List[Union[str, int, float]]) -> bool:
@@ -223,9 +252,19 @@ class YAMLStrategy(Strategy):
     def _check_macd_cross(self, row: pd.Series, comparison: str) -> bool:
         """Handle MACD specific crossing logic"""
         if comparison == "crosses_above":
-            return (row['macd'] > row['macd_signal']) and (row['macd_prev'] <= row['macdsignal_prev'])
+            evaluation = (row['macd'] > row['macd_signal']) and (row['macd_prev'] <= row['macdsignal_prev'])
+            if evaluation:
+                self.log_message("MACD crosses above signal")
+                self.log_message(f"MACD: {row['macd']:.2f}, Signal: {row['macd_signal']:.2f}")
+                self.log_message(f"MACD_prev: {row['macd_prev']:.2f}, Signal_prev: {row['macdsignal_prev']:.2f}")
+            return evaluation
         else:  # crosses_below
-            return (row['macd'] < row['macd_signal']) and (row['macd_prev'] >= row['macdsignal_prev'])
+            evaluation = (row['macd'] < row['macd_signal']) and (row['macd_prev'] >= row['macdsignal_prev'])
+            if evaluation:
+                self.log_message("MACD crosses below signal")
+                self.log_message(f"MACD: {row['macd']:.2f}, Signal: {row['macd_signal']:.2f}")
+                self.log_message(f"MACD_prev: {row['macd_prev']:.2f}, Signal_prev: {row['macdsignal_prev']:.2f}")
+            return evaluation
 
 
     def _check_bbands_cross(self, row: pd.Series, comparison: str, value: str) -> bool:
@@ -233,9 +272,19 @@ class YAMLStrategy(Strategy):
         value_key = value.lower() if isinstance(value, str) else value
         
         if comparison == "crosses_above":
-            return (row['close'] > row[value_key]) and (row['close_prev'] <= row[value_key])
+            evaluation = (row['close'] > row[value_key]) and (row['close_prev'] <= row[value_key])
+            if evaluation:
+                self.log_message("Price crosses above Bollinger Band")
+                self.log_message(f"Close: {row['close']:.2f}, {value_key}: {row[value_key]:.2f}")
+                self.log_message(f"Close_prev: {row['close_prev']:.2f}, {value_key}_prev: {row[value_key]:.2f}")
+            return evaluation
         else:  # crosses_below
-            return (row['close'] < row[value_key]) and (row['close_prev'] >= row[value_key])
+            evaluation = (row['close'] < row[value_key]) and (row['close_prev'] >= row[value_key])
+            if evaluation:
+                self.log_message("Price crosses below Bollinger Band")
+                self.log_message(f"Close: {row['close']:.2f}, {value_key}: {row[value_key]:.2f}")
+                self.log_message(f"Close_prev: {row['close_prev']:.2f}, {value_key}_prev: {row[value_key]:.2f}")
+            return evaluation
   
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Automated Trading Strategy Backtester')
@@ -245,7 +294,10 @@ if __name__ == "__main__":
     parser.add_argument('-k','--api_keys',
                         required=True,
                         help='API Keys for Live Trading')
-
+    parser.add_argument("mode", choices=["live", "paper", "backtest"],
+                        help="Run mode: 'live' for live trading on real money account, 'paper' for live trading on paper account, 'backtest' for historical testing")
+    
+    
     args = parser.parse_args()
 
 
@@ -260,19 +312,35 @@ if __name__ == "__main__":
 
     strategy = TrueBautistStrategy(yaml_trade_config, keys)
     print(strategy.get_config())
-    is_live = False
-
-    if is_live:
-        from lumibot.credentials import ALPACA_CONFIG
+    
+    ALPACA_CONFIG = {
+    # Put your own Alpaca key here:
+    "API_KEY": keys["API_KEY"],
+    # Put your own Alpaca secret here:
+    "API_SECRET": keys["API_SECRET"],
+    # If you want to go live, you must change this
+    "PAPER": True,
+    }
+    
+    
+    
+    if args.mode == 'live':
         from lumibot.brokers import Alpaca
-
+        # LIVE TRADE; ENSURE LIVE API KEYS IN COMMAND LINE ARGS
+        ALPACA_CONFIG = ALPACA_CONFIG['PAPER'] = False
         broker = Alpaca(ALPACA_CONFIG)
 
         lumistrategy = YAMLStrategy(broker=broker, true_bautist_config=strategy)
         lumistrategy.run_live()
 
-    else:
+    elif args.mode == 'paper':
+        # PAPER TRADE; ENSURE PAPER API KEYS IN COMMAND LINE ARGS
+        broker = Alpaca(ALPACA_CONFIG)
 
+        lumistrategy = YAMLStrategy(broker=broker, true_bautist_config=strategy)
+        lumistrategy.run_live()
+    else:
+        # BACKTEST ONLY
         backtesting_start = datetime.strptime(strategy.config['start_date'], "%Y-%m-%d")
         backtesting_end = datetime.strptime(strategy.config['end_date'], "%Y-%m-%d")
         YAMLStrategy.backtest(YahooDataBacktesting,

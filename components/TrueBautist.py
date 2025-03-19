@@ -95,11 +95,11 @@ class TrueBautistStrategy:
 
         if self.keys.get('api_key_paper'):
 
-            data_manager = AlpacaDataFetcher(self.keys['api_key_paper'], 
-                                            self.keys['api_secret_paper'])
+            data_manager = AlpacaDataFetcher(self.keys['API_KEY'], 
+                                            self.keys['API_SECRET'])
         else:
-            data_manager = AlpacaDataFetcher(self.keys['api_key'], 
-                                            self.keys['api_secret'])
+            data_manager = AlpacaDataFetcher(self.keys['API_KEY'], 
+                                            self.keys['API_SECRET'])
 
         print("Getting data for these symbols: ", cfg['symbols'])
 

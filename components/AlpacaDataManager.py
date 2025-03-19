@@ -122,6 +122,7 @@ class AlpacaDataFetcher:
             # format the bars alpaca api response into a dataframe
             response = requests.get(self.url, headers=self.headers, params=self.payload)
             data = response.json()
+            print(data)
             dfs = []
             for symbol, bars in data['bars'].items():
                 symbol_df = self._process_raw_bars_to_df(bars)

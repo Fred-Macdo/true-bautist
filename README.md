@@ -12,7 +12,7 @@ Windows (Godspeed)
 
 Install the msi for TA-Lib, a technical analysis library, then run msiexec from the command line. 
 
-[Technical Analysis Library Github](https://github.com/ta-lib/ta-lib-python#windows
+[Technical Analysis Library Github](https://github.com/ta-lib/ta-lib-python#windows)
 
 Then run the requirements.txt.
 `pip install -r requirements.txt`
