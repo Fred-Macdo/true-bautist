@@ -1,0 +1,21 @@
+time,strategy,identifier,symbol,side,type,status,multiplier,time_in_force,asset.strike,asset.multiplier,asset.asset_type,price,filled_quantity,trade_cost
+2025-01-08 09:30:00-05:00,YAMLStrategy,42280d60572e4593bd6436fb7785865c,TSLZ,buy,market,new,1,gtc,0.0,1,stock,,,
+2025-01-08 09:30:00-05:00,YAMLStrategy,42280d60572e4593bd6436fb7785865c,TSLZ,buy,market,fill,1,gtc,0.0,1,stock,2.5399999618530273,9920.0,0.0
+2025-01-14 09:30:00-05:00,YAMLStrategy,11335ce67b3b484f939d41445c13e35b,TSLZ,sell,limit,canceled,1,day,0.0,1,stock,,,
+2025-01-14 09:30:00-05:00,YAMLStrategy,8774da222e6f413c97e49b03d04e3500,TSLZ,sell,stop,fill,1,day,0.0,1,stock,2.27,9920.0,0.0
+2025-01-30 09:30:00-05:00,YAMLStrategy,0553964449b94828bf1b1c5f11a37cdd,TSLZ,buy,market,new,1,gtc,0.0,1,stock,,,
+2025-01-30 09:30:00-05:00,YAMLStrategy,0553964449b94828bf1b1c5f11a37cdd,TSLZ,buy,market,fill,1,gtc,0.0,1,stock,2.240000009536743,9674.0,0.0
+2025-01-31 09:30:00-05:00,YAMLStrategy,cd34b46114cd4de2b82916338b0f6ff3,TSLZ,sell,limit,canceled,1,day,0.0,1,stock,,,
+2025-01-31 09:30:00-05:00,YAMLStrategy,df2dc635d0ab41c882553b7852db33dc,TSLZ,sell,stop,fill,1,day,0.0,1,stock,2.26,9674.0,0.0
+2025-02-04 09:30:00-05:00,YAMLStrategy,aac40afed6ba46ec84895f3b72b0a4df,TSLZ,buy,market,new,1,gtc,0.0,1,stock,,,
+2025-02-04 09:30:00-05:00,YAMLStrategy,aac40afed6ba46ec84895f3b72b0a4df,TSLZ,buy,market,fill,1,gtc,0.0,1,stock,2.559999942779541,9579.0,0.0
+2025-02-11 09:30:00-05:00,YAMLStrategy,f71902f14cc14068a7c75f553a2928f8,TSLZ,sell,stop,canceled,1,day,0.0,1,stock,,,
+2025-02-11 09:30:00-05:00,YAMLStrategy,e251793c325f4166a6da2af1ef38d4e2,TSLZ,sell,limit,canceled,1,day,0.0,1,stock,,,
+2025-02-11 09:30:00-05:00,YAMLStrategy,838dc979bf784bc698cc70d05412534c,TSLZ,sell,market,new,1,day,0.0,1,stock,,,
+2025-02-11 09:30:00-05:00,YAMLStrategy,838dc979bf784bc698cc70d05412534c,TSLZ,sell,market,fill,1,day,0.0,1,stock,3.0899999141693115,9579.0,0.0
+2025-02-25 09:30:00-05:00,YAMLStrategy,2c55c7535e3a47339fbe77e75582960a,SPXU,buy,market,new,1,gtc,0.0,1,stock,,,
+2025-02-25 09:30:00-05:00,YAMLStrategy,2c55c7535e3a47339fbe77e75582960a,SPXU,buy,market,fill,1,gtc,0.0,1,stock,21.559999465942383,1190.0,0.0
+2025-02-28 09:30:00-05:00,YAMLStrategy,e171c0b3a0984e46837388a1b2801071,SPXU,sell,stop,canceled,1,day,0.0,1,stock,,,
+2025-02-28 09:30:00-05:00,YAMLStrategy,70edf812612247278b86a20ae3062790,SPXU,sell,limit,canceled,1,day,0.0,1,stock,,,
+2025-02-28 09:30:00-05:00,YAMLStrategy,0c851c36aae14479b6c130258d8878a2,SPXU,sell,market,new,1,day,0.0,1,stock,,,
+2025-02-28 09:30:00-05:00,YAMLStrategy,0c851c36aae14479b6c130258d8878a2,SPXU,sell,market,fill,1,day,0.0,1,stock,22.889999389648438,1190.0,0.0

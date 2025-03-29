@@ -87,9 +87,18 @@ exit_conditions:
 ```
 
 - Finally, tweak the risk-management framework which will help you protect your assets during trading. **NOTE:** `risk_per_trade`, `stop_loss`, and `take_profit` are expressed as percents.
+[
+### **3. Run the backtest using the `live`, `paper`, or `backtest` keyword argument after specifying config/api keys**
 
-### **3. Run the backtest using the --backtest flag.**
+##### Stocks
+To run paper trading of stocks on your <configuration.yaml> file:
 
-`python run_true_bautist.py -c <configuration.yaml> -k <api_keys.yaml>`
+`python stock_trading.py -c <configuration.yaml> -k <api_keys.yaml> paper` 
 
-**NOTE:** Use the `--live` flag to run your strategy live. In addition you will need to add your `<api_keys.yaml>` after the `configuration.yaml` file while running on the command line. I have set it up for [Alpaca Trading](https://app.alpaca.markets/signup). Alpaca is an API First Brokerage that enables completely free algo trading.
+##### Crypto
+
+To run a backtest of crypto trading using your <configuration.yaml> file:
+
+`python crypto_trading.py -c <configuration.yaml> -k <api_keys.yaml> backtest`
+
+**NOTE:** You will need to specify your `<api_keys.yaml>` after the `configuration.yaml` file running on the command line. I have set it up for [Alpaca Trading](https://app.alpaca.markets/signup). Alpaca is an API First Brokerage that enables completely free algo trading.
