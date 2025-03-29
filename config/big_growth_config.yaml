@@ -1,0 +1,49 @@
+# Universe
+symbols: ["GOOG", "AAPL", "TSLA", "NFLX", "MSFT"]
+timeframe: "30M" # (M)INUTE, (H)OUR, (D)AY
+start_date: "2024-01-01" # YYYY-MM-DD
+end_date: "2025-03-14" # YYYY-MM-DD
+
+# REQUIRED INDICATORS
+indicators:
+  - name: "EMA"
+    params:
+      period: 5
+  - name: "SMA"
+    params:
+      period: 20
+  - name: "EMA"
+    params:
+      period: 10
+  - name: "RSI"
+    params: 
+      period: 14
+
+# CONDITIONS
+# BASED ON AN INDICATOR-COLUMN (CAN BE ANY COLUMN, MOVING AVERAGE INDICATOR COLUMNS HAVE '_20', '_5' SUFFIX),
+# A COMPARISON (ABOVE, BELOW, CROSSES_ABOVE, CROSSES_BELOW, BETWEEN),
+# AND A VALUE, CAN BE EITHER A NUMERICAL VALUE, OR ANOTHER COLUMN / INDICATOR-COLUMN
+
+# ENTRY CONDITIONS
+entry_conditions:
+  - indicator: "ema_5"
+    comparison: "crosses_above"
+    value: sma_20
+
+# EXIT CONDITIONS
+exit_conditions:
+  - indicator: "rsi"
+    comparison: "crosses_above"
+    value: 70
+
+# RISK MANAGEMENT
+risk_management:
+  position_sizing_method: "risk_based" 
+  risk_per_trade: 0.25 # PERCENTAGE
+  stop_loss: 0.10 # PERCENTAGE
+  take_profit: 0.2 # PERCENTAGE
+  max_position_size: 1000.0
+  atr_multiplier: 2.0
+
+
+### Epic growth for a rotation into a sector - re: quantum

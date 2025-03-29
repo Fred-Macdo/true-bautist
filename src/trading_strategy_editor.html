@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trading Strategy YAML Editor</title>
+  <!-- React CDN Links -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  
+  <!-- Babel for JSX support -->
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  
+  <!-- Lodash -->
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+  
+  <!-- Marked - for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.0.12/marked.min.js"></script>
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .app-container {
+      display: flex;
+      min-height: 100vh;
+    }
+    .sidebar {
+      width: 500px;
+      background: #f8f9fa;
+      border-right: 1px solid #ddd;
+      height: 100vh;
+      overflow-y: auto;
+      position: sticky;
+      top: 0;
+      padding: 15px;
+      box-sizing: border-box;
+    }
+    .main-content {
+      flex: 1;
+      padding: 20px;
+      box-sizing: border-box;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+    .card-header {
+      background-color: #f8f9fa;
+      padding: 10px 15px;
+      border-bottom: 1px solid #ddd;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-body {
+      padding: 15px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-danger {
+      background-color: #dc3545;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+    }
+    .btn-purple {
+      background-color: #6f42c1;
+    }
+    .btn-green {
+      background-color: #28a745;
+    }
+    .btn-red {
+      background-color: #dc3545;
+    }
+    .yaml-output {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .tag-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .tag {
+      background-color: #e2e8f0;
+      border-radius: 4px;
+      padding: 5px 8px;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+    }
+    .tag button {
+      margin-left: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #777;
+    }
+    .helper-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .actions-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+    .indicator-box {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background-color: #f8f9fa;
+    }
+    .indicator-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .params-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+    .condition-box {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background-color: #f8f9fa;
+    }
+    .docs-tabs {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 15px;
+    }
+    .docs-tab {
+      padding: 8px 12px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      margin-right: 5px;
+      font-size: 14px;
+    }
+    .docs-tab.active {
+      background-color: #fff;
+      border-color: #ddd;
+      margin-bottom: -1px;
+      font-weight: 500;
+    }
+    .docs-content {
+      padding: 10px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .docs-content h1 {
+      font-size: 20px;
+      margin-top: 0;
+    }
+    .docs-content h2 {
+      font-size: 18px;
+      margin-top: 16px;
+    }
+    .docs-content h3 {
+      font-size: 16px;
+      margin-top: 14px;
+    }
+    .docs-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10px 0;
+    }
+    .docs-content th, .docs-content td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .docs-content th {
+      background-color: #f2f2f2;
+    }
+    .docs-content code {
+      background-color: #f8f9fa;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .toggle-sidebar {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px;
+      cursor: pointer;
+      display: none;
+    }
+    @media (max-width: 768px) {
+      .app-container {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        display: none;
+      }
+      .sidebar.open {
+        display: block;
+      }
+      .toggle-sidebar {
+        display: block;
+      }
+      .main-content {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Documentation content in Markdown
+    const docsContent = {
+      overview: `# Trading Strategy System
+
+A powerful framework for developing, testing, and executing algorithmic trading strategies. This system combines technical indicators, customizable entry/exit conditions, and comprehensive risk management to create robust trading strategies.
+
+## Overview
+
+The Trading Strategy System allows you to:
+
+1. **Define strategies** using a simple YAML configuration
+2. **Test strategies** with historical market data
+3. **Analyze performance** through detailed metrics
+4. **Optimize parameters** to improve results
+5. **Execute strategies** in live or paper trading environments
+
+The system is built around the concept of technical analysis indicators combined with rule-based entry and exit conditions.`,
+      
+      indicators: `## Technical Indicators
+
+The following technical indicators are available:
+
+### Moving Averages
+
+| Indicator | Description | Parameters |
+|-----------|-------------|------------|
+| **SMA** | Simple Moving Average | \`period\`: Number of periods to average (default: 20) |
+| **EMA** | Exponential Moving Average | \`period\`: Number of periods with exponential weighting (default: 20) |
+
+### Oscillators
+
+| Indicator | Description | Parameters |
+|-----------|-------------|------------|
+| **RSI** | Relative Strength Index | \`period\`: Lookback period (default: 14) |
+| **CCI** | Commodity Channel Index | \`period\`: Lookback period (default: 20) |
+| **MFI** | Money Flow Index | \`period\`: Lookback period (default: 14) |
+
+### Volatility Indicators
+
+| Indicator | Description | Parameters |
+|-----------|-------------|------------|
+| **ATR** | Average True Range | \`period\`: Lookback period (default: 14) |
+| **BBANDS** | Bollinger Bands | \`period\`: MA period (default: 20)<br>\`std_dev\`: Standard deviation multiplier (default: 2) |
+| **Keltner Channels** | Volatility-based channels | \`period\`: MA period (default: 20)<br>\`atr_multiplier\`: ATR multiplier (default: 2) |
+
+### Trend Indicators
+
+| Indicator | Description | Parameters |
+|-----------|-------------|------------|
+| **ADX** | Average Directional Index | \`period\`: Lookback period (default: 14) |
+| **MACD** | Moving Average Convergence Divergence | \`fast_period\`: Fast EMA period (default: 12)<br>\`slow_period\`: Slow EMA period (default: 26)<br>\`signal_period\`: Signal line period (default: 9) |
+| **STOCH** | Stochastic Oscillator | \`k_period\`: %K period (default: 14)<br>\`d_period\`: %D period (default: 3)<br>\`slowing\`: Slowing period (default: 3) |
+
+### Volume Indicators
+
+| Indicator | Description | Parameters |
+|-----------|-------------|------------|
+| **OBV** | On-Balance Volume | No parameters required |
+| **VWAP** | Volume-Weighted Average Price | \`period\`: Lookback period (default: 5) |
+
+### Output Values
+
+Each indicator produces specific output values that can be referenced in entry/exit conditions:
+
+- **SMA/EMA**: Single value (\`sma_XX\`, \`ema_XX\` where XX is the period)
+- **RSI**: Single value (\`rsi\`)
+- **BBANDS**: Three values (\`upperband\`, \`middleband\`, \`lowerband\`)
+- **ATR**: Single value (\`atr\`)
+- **Keltner Channels**: Three values (\`keltner_upper\`, \`keltner_middle\`, \`keltner_lower\`)
+- **ADX**: Single value (\`adx\`)
+- **OBV**: Single value (\`obv\`)
+- **MFI**: Single value (\`mfi\`)
+- **CCI**: Single value (\`cci\`)
+- **VWAP**: Single value (\`vwap\`)
+- **MACD**: Three values (\`macd\`, \`macd_signal\`, \`macd_hist\`)
+- **STOCH**: Two values (\`slowk\`, \`slowd\`)`,
+      
+      conditions: `## Entry and Exit Conditions
+
+Entry and exit conditions use a simple rule-based syntax:
+
+\`\`\`yaml
+- indicator: "INDICATOR_NAME"
+  comparison: "COMPARISON_OPERATOR"
+  value: "VALUE_OR_INDICATOR"
+\`\`\`
+
+### Available Indicators
+
+You can use any of these values as the \`indicator\` or \`value\`:
+
+- Price data: \`open\`, \`high\`, \`low\`, \`close\`, \`volume\`
+- Technical indicators: Any indicator output from the configured indicators
+  - Moving averages: \`sma_XX\`, \`ema_XX\` (where XX is the period)
+  - Oscillators: \`rsi\`, \`cci\`, \`mfi\`
+  - Volatility: \`atr\`, \`upperband\`, \`middleband\`, \`lowerband\`, \`keltner_upper\`, \`keltner_middle\`, \`keltner_lower\`
+  - Trend: \`adx\`, \`macd\`, \`macd_signal\`, \`macd_hist\`
+  - Volume: \`obv\`, \`vwap\`
+
+### Comparison Operators
+
+The following comparison operators are available:
+
+- \`above\`: Indicator is greater than value
+- \`below\`: Indicator is less than value
+- \`between\`: Indicator is between two values (requires a range passed between brackets: [ ])
+- \`crosses_above\`: Indicator crosses above value
+- \`crosses_below\`: Indicator crosses below value
+
+### Value Types
+
+The \`value\` field can be:
+
+1. Another indicator (e.g., \`sma_50\`)
+2. A numeric constant (e.g., \`70\` for RSI)
+3. A price level (e.g., \`145.50\`)`,
+      
+      riskManagement: `## Risk Management
+
+The system provides several position sizing methods and risk control parameters:
+
+### Position Sizing Methods
+
+1. **Risk-Based**: Sizes positions based on the specified percentage risk per trade and the distance to stop loss
+2. **ATR-Based**: Uses Average True Range to determine position size
+3. **Fixed**: Uses a fixed position size for all trades
+4. **Percentage**: Uses a percentage of available capital for each trade
+
+### Risk Parameters
+
+- **Risk Per Trade**: Percentage of account to risk on each trade
+- **Stop Loss**: Percentage or ATR-based stop loss level
+- **Take Profit**: Percentage or ATR-based take profit level
+- **Max Position Size**: Maximum position size in currency units
+- **ATR Multiplier**: Multiplier for ATR-based stops and targets`,
+      
+      examples: `## Strategy Examples
+
+### Simple Moving Average Crossover
+
+\`\`\`yaml
+symbols: ["SPY"]
+timeframe: "1d"
+start_date: "2023-01-01"
+end_date: "2024-01-01"
+
+entry_conditions:
+  - indicator: "ema_12"
+    comparison: "crosses_above"
+    value: "ema_26"
+
+exit_conditions:
+  - indicator: "ema_12"
+    comparison: "crosses_below"
+    value: "ema_26"
+
+risk_management:
+  position_sizing_method: "percentage"
+  risk_per_trade: 2.0
+  stop_loss: 0.05
+  take_profit: 0.15
+  max_position_size: 10000.0
+
+indicators:
+  - name: "EMA"
+    params:
+      period: 12
+  - name: "EMA"
+    params:
+      period: 26
+\`\`\`
+
+### RSI Mean Reversion
+
+\`\`\`yaml
+symbols: ["AAPL", "MSFT", "GOOG", "AMZN"]
+timeframe: "1d"
+start_date: "2023-01-01"
+end_date: "2024-01-01"
+
+entry_conditions:
+  - indicator: "rsi"
+    comparison: "below"
+    value: "30"
+  - indicator: "close"
+    comparison: "above"
+    value: "sma_200"
+
+exit_conditions:
+  - indicator: "rsi"
+    comparison: "above"
+    value: "70"
+  - indicator: "close"
+    comparison: "below"
+    value: "sma_50"
+
+risk_management:
+  position_sizing_method: "risk_based"
+  risk_per_trade: 1.0
+  stop_loss: 0.03
+  take_profit: 0.09
+  max_position_size: 5000.0
+
+indicators:
+  - name: "RSI"
+    params:
+      period: 14
+  - name: "SMA"
+    params:
+      period: 50
+  - name: "SMA"
+    params:
+      period: 200
+\`\`\``
+    };
+
+    const TradingStrategyYamlEditor = () => {
+      // State for the trading strategy config
+      const [config, setConfig] = React.useState({
+        symbols: ["AAPL", "MSFT", "GOOG"],
+        timeframe: "1d",
+        start_date: "2024-01-01",
+        end_date: "2024-12-31",
+        entry_conditions: [
+          {
+            indicator: "close",
+            comparison: "above",
+            value: "sma_20",
+            isCustomValue: false
+          }
+        ],
+        exit_conditions: [
+          {
+            indicator: "close",
+            comparison: "below",
+            value: "sma_20",
+            isCustomValue: false
+          }
+        ],
+        risk_management: {
+          position_sizing_method: "risk_based",
+          risk_per_trade: 1.0,
+          stop_loss: 0.02,
+          take_profit: 0.06,
+          max_position_size: 1000.0,
+          atr_multiplier: 2.0
+        },
+        indicators: [
+          { name: "SMA", params: { period: 20 } },
+          { name: "RSI", params: { period: 14 } }
+        ]
+      });
+      
+      // State for UI
+      const [symbolInput, setSymbolInput] = React.useState("");
+      const [yamlOutput, setYamlOutput] = React.useState("");
+      const [expandedSections, setExpandedSections] = React.useState({
+        general: true,
+        indicators: true,
+        entryConditions: true,
+        exitConditions: true,
+        riskManagement: true,
+        yamlOutput: true
+      });
+      const [activeDocTab, setActiveDocTab] = React.useState("overview");
+      const [sidebarOpen, setSidebarOpen] = React.useState(true);
+      
+      // Constants
+      const timeframeOptions = ["1Min", "5Min", "15Min", "30Min", "1h", "1d", "2d", "1w", "1month"];
+      const comparisonOptions = ["above", "below", "between", "crosses_above", "crosses_below"];
+      const positionSizingMethods = ["risk_based", "atr_based", "fixed", "percentage"];
+      
+      // Full list of indicators from the readme
+      const indicatorTypes = [
+        "SMA", "EMA", // Moving Averages
+        "RSI", "CCI", "MFI", // Oscillators
+        "ATR", "BBANDS", "Keltner Channels", // Volatility Indicators
+        "ADX", "MACD", "STOCH", // Trend Indicators
+        "OBV", "VWAP" // Volume Indicators
+      ];
+      
+      // Generate a list of available indicators for dropdowns
+      const getAvailableIndicators = () => {
+        const basicIndicators = ['open', 'high', 'low', 'close', 'volume'];
+        
+        // Add configured indicators with their parameters
+        const technicalIndicators = config.indicators.map(ind => {
+          const name = ind.name.toLowerCase();
+          if (name === 'bbands') {
+            return ['upperband', 'middleband', 'lowerband'];
+          } else if (name === 'keltner channels') {
+            return ['keltner_upper', 'keltner_middle', 'keltner_lower'];
+          } else if (name === 'macd') {
+            return ['macd', 'macd_signal', 'macd_hist'];
+          } else if (name === 'stoch') {
+            return ['slowk', 'slowd'];
+          } else if (name === 'sma' || name === 'ema') {
+            const period = ind.params.period;
+            return [`${name.toLowerCase()}_${period}`];
+          } else if (name === 'rsi' || name === 'cci' || name === 'mfi' || name === 'adx' || name === 'obv' || name === 'vwap' || name === 'atr') {
+            // Single value indicators
+            return [name.toLowerCase()];
+          }
+          return [];
+        }).flat();
+        
+        return [...basicIndicators, ...technicalIndicators];
+      };
+      
+      // Generate YAML output
+      React.useEffect(() => {
+        try {
+          let output = "";
+          
+          // Symbols
+          output += `symbols: [${config.symbols.map(s => `"${s}"`).join(", ")}]\n`;
+          
+          // Timeframe
+          output += `timeframe: "${config.timeframe}"\n`;
+          
+          // Dates
+          output += `start_date: "${config.start_date}"\n`;
+          output += `end_date: "${config.end_date}"\n\n`;
+          
+          // Entry conditions
+          output += "# Entry conditions\n";
+          output += "entry_conditions:\n";
+          config.entry_conditions.forEach(condition => {
+            output += `  - indicator: "${condition.indicator}"\n`;
+            output += `    comparison: "${condition.comparison}"\n`;
+            output += `    value: "${condition.value}"\n`;
+          });
+          output += "\n";
+          
+          // Exit conditions
+          output += "# Exit conditions\n";
+          output += "exit_conditions:\n";
+          config.exit_conditions.forEach(condition => {
+            output += `  - indicator: "${condition.indicator}"\n`;
+            output += `    comparison: "${condition.comparison}"\n`;
+            output += `    value: "${condition.value}"\n`;
+          });
+          output += "\n";
+          
+          // Risk management
+          output += "# Risk management parameters\n";
+          output += "risk_management:\n";
+          output += `  position_sizing_method: "${config.risk_management.position_sizing_method}"\n`;
+          output += `  risk_per_trade: ${config.risk_management.risk_per_trade}\n`;
+          output += `  stop_loss: ${config.risk_management.stop_loss}\n`;
+          output += `  take_profit: ${config.risk_management.take_profit}\n`;
+          output += `  max_position_size: ${config.risk_management.max_position_size}\n`;
+          output += `  atr_multiplier: ${config.risk_management.atr_multiplier}\n\n`;
+          
+          // Indicators
+          output += "# Required indicators\n";
+          output += "indicators:\n";
+          config.indicators.forEach(indicator => {
+            output += `  - name: "${indicator.name}"\n`;
+            output += "    params:\n";
+            Object.entries(indicator.params).forEach(([key, value]) => {
+              output += `      ${key}: ${value}\n`;
+            });
+          });
+          
+          setYamlOutput(output);
+        } catch (error) {
+          console.error("Error generating YAML:", error);
+        }
+      }, [config]);
+      
+      // Effect for updating conditions when indicators change
+      React.useEffect(() => {
+        const availableIndicators = getAvailableIndicators();
+        
+        // Update entry and exit conditions if their indicators aren't in the list
+        const updateConditions = (conditions) => {
+          return conditions.map(condition => {
+            // Skip custom values
+            if (condition.isCustomValue) {
+              return condition;
+            }
+            
+            let updatedCondition = {...condition};
+            
+            if (!availableIndicators.includes(condition.indicator)) {
+              updatedCondition.indicator = availableIndicators[0] || 'close';
+            }
+            
+            if (!availableIndicators.includes(condition.value) && !condition.isCustomValue) {
+              updatedCondition.value = availableIndicators[0] || 'close';
+            }
+            
+            return updatedCondition;
+          });
+        };
+        
+        const updatedEntryConditions = updateConditions(config.entry_conditions);
+        const updatedExitConditions = updateConditions(config.exit_conditions);
+        
+        if (JSON.stringify(updatedEntryConditions) !== JSON.stringify(config.entry_conditions) || 
+            JSON.stringify(updatedExitConditions) !== JSON.stringify(config.exit_conditions)) {
+          setConfig(prev => ({
+            ...prev,
+            entry_conditions: updatedEntryConditions,
+            exit_conditions: updatedExitConditions
+          }));
+        }
+      }, [config.indicators]);
+      
+      // Add symbols from comma-separated input
+      const addSymbols = () => {
+        if (symbolInput.trim()) {
+          // Split by commas, trim whitespace, convert to uppercase, and filter out empty strings
+          const newSymbols = symbolInput
+            .split(',')
+            .map(s => s.trim().toUpperCase())
+            .filter(s => s !== '');
+          
+          // Add only unique symbols that don't already exist in the config
+          if (newSymbols.length > 0) {
+            setConfig(prev => {
+              const uniqueNewSymbols = newSymbols.filter(s => !prev.symbols.includes(s));
+              return {
+                ...prev, 
+                symbols: [...prev.symbols, ...uniqueNewSymbols]
+              };
+            });
+            setSymbolInput("");
+          }
+        }
+      };
+      
+      // Remove a symbol
+      const removeSymbol = (symbol) => {
+        setConfig(prev => ({
+          ...prev, 
+          symbols: prev.symbols.filter(s => s !== symbol)
+        }));
+      };
+      
+      // Clear all symbols
+      const clearAllSymbols = () => {
+        setConfig(prev => ({
+          ...prev,
+          symbols: []
+        }));
+      };
+      
+      // Handle keyboard input for adding symbols (on Enter key)
+      const handleSymbolInputKeyPress = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addSymbols();
+        }
+      };
+      
+      // Toggle section expand/collapse
+      const toggleSection = (section) => {
+        setExpandedSections(prev => ({
+          ...prev,
+          [section]: !prev[section]
+        }));
+      };
+      
+      // Toggle sidebar on mobile
+      const toggleSidebar = () => {
+        setSidebarOpen(!sidebarOpen);
+      };
+      
+      // Get default parameters for an indicator
+      const getDefaultParams = (indicatorName) => {
+        switch (indicatorName) {
+          case 'SMA':
+          case 'EMA':
+            return { period: 20 };
+          case 'RSI':
+          case 'MFI':
+            return { period: 14 };
+          case 'CCI':
+            return { period: 20 };
+          case 'MACD':
+            return { fast_period: 12, slow_period: 26, signal_period: 9 };
+          case 'BBANDS':
+            return { period: 20, std_dev: 2 };
+          case 'Keltner Channels':
+            return { period: 20, atr_multiplier: 2 };
+          case 'ATR':
+          case 'ADX':
+            return { period: 14 };
+          case 'STOCH':
+            return { k_period: 14, d_period: 3, slowing: 3 };
+          case 'VWAP':
+            return { period: 5 };
+          case 'OBV':
+            return {}; // No parameters required
+          default:
+            return { period: 14 };
+        }
+      };
+      
+      // Add a new indicator
+      const addIndicator = () => {
+        const newIndicator = {
+          name: "SMA",
+          params: getDefaultParams("SMA")
+        };
+        
+        setConfig(prev => ({
+          ...prev,
+          indicators: [...prev.indicators, newIndicator]
+        }));
+      };
+      
+      // Update an indicator
+      const updateIndicator = (index, field, value) => {
+        setConfig(prev => {
+          const updated = [...prev.indicators];
+          
+          if (field === 'name') {
+            updated[index] = {
+              name: value,
+              params: getDefaultParams(value)
+            };
+          } else if (field.startsWith('param_')) {
+            const paramName = field.replace('param_', '');
+            updated[index] = {
+              ...updated[index],
+              params: {
+                ...updated[index].params,
+                [paramName]: parseInt(value) || 0
+              }
+            };
+          }
+          
+          return {...prev, indicators: updated};
+        });
+      };
+      
+      // Remove an indicator
+      const removeIndicator = (index) => {
+        setConfig(prev => ({
+          ...prev,
+          indicators: prev.indicators.filter((_, i) => i !== index)
+        }));
+      };
+      
+      // Add a condition (entry or exit)
+      const addCondition = (type) => {
+        const availableIndicators = getAvailableIndicators();
+        const newCondition = {
+          indicator: availableIndicators[0] || 'close',
+          comparison: "above", 
+          value: availableIndicators.length > 1 ? availableIndicators[1] : 'close',
+          isCustomValue: false
+        };
+        
+        setConfig(prev => ({
+          ...prev,
+          [type]: [...prev[type], newCondition]
+        }));
+      };
+      
+      // Update a condition
+      const updateCondition = (type, index, field, value) => {
+        setConfig(prev => {
+          const updated = [...prev[type]];
+          
+          // Special handling for custom values
+          if (field === 'value' && value === 'custom') {
+            // When selecting "custom", initialize with empty string
+            updated[index] = {...updated[index], [field]: '', isCustomValue: true};
+          } else if (field === 'value' && updated[index].isCustomValue) {
+            // When entering a value while in custom mode
+            updated[index] = {...updated[index], [field]: value};
+          } else {
+            // Normal field updates
+            updated[index] = {...updated[index], [field]: value, isCustomValue: false};
+          }
+          
+          return {...prev, [type]: updated};
+        });
+      };
+      
+      // Remove a condition
+      const removeCondition = (type, index) => {
+        setConfig(prev => ({
+          ...prev,
+          [type]: prev[type].filter((_, i) => i !== index)
+        }));
+      };
+      
+      // Update risk management settings
+      const updateRiskManagement = (field, value) => {
+          // Convert to number for numeric fields
+          const numericFields = ['risk_per_trade', 'stop_loss', 'take_profit', 'max_position_size', 'atr_multiplier'];
+          const processedValue = numericFields.includes(field) ? parseFloat(value) || 0 : value;
+          
+          setConfig(prev => ({
+            ...prev,
+            risk_management: {
+              ...prev.risk_management,
+              [field]: processedValue
+            }
+          }));
+        };
+        
+        // Handle download
+        const downloadYaml = () => {
+          const blob = new Blob([yamlOutput], { type: 'text/yaml' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'trading_strategy.yaml';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        };
+
+        return (
+          <div className="app-container">
+            {/* Toggle Sidebar Button (only visible on mobile) */}
+            <button className="toggle-sidebar" onClick={toggleSidebar}>
+              {sidebarOpen ? '×' : '☰'}
+            </button>
+            
+            {/* Documentation Sidebar */}
+            <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+              <h2>Documentation</h2>
+              <div className="docs-tabs">
+                <div 
+                  className={`docs-tab ${activeDocTab === 'overview' ? 'active' : ''}`} 
+                  onClick={() => setActiveDocTab('overview')}
+                >
+                  Overview
+                </div>
+                <div 
+                  className={`docs-tab ${activeDocTab === 'indicators' ? 'active' : ''}`} 
+                  onClick={() => setActiveDocTab('indicators')}
+                >
+                  Indicators
+                </div>
+                <div 
+                  className={`docs-tab ${activeDocTab === 'conditions' ? 'active' : ''}`} 
+                  onClick={() => setActiveDocTab('conditions')}
+                >
+                  Conditions
+                </div>
+                <div 
+                  className={`docs-tab ${activeDocTab === 'riskManagement' ? 'active' : ''}`} 
+                  onClick={() => setActiveDocTab('riskManagement')}
+                >
+                  Risk
+                </div>
+                <div 
+                  className={`docs-tab ${activeDocTab === 'examples' ? 'active' : ''}`} 
+                  onClick={() => setActiveDocTab('examples')}
+                >
+                  Examples
+                </div>
+              </div>
+              <div className="docs-content" 
+                dangerouslySetInnerHTML={{ __html: marked.parse(docsContent[activeDocTab]) }} 
+              />
+            </div>
+            
+            {/* Main Editor Content */}
+            <div className="main-content">
+              <h1>Trading Strategy YAML Editor</h1>
+              
+              <div style={{display: 'flex', gap: '20px', flexDirection: 'column'}}>
+                {/* General Settings Card */}
+                <div className="card">
+                  <div className="card-header" onClick={() => toggleSection('general')}>
+                    <span>General Settings</span>
+                    <span>{expandedSections.general ? '▲' : '▼'}</span>
+                  </div>
+                  
+                  {expandedSections.general && (
+                    <div className="card-body">
+                      {/* Symbols */}
+                      <div className="form-group">
+                        <label>Trading Symbols</label>
+                        <div className="tag-container">
+                          {config.symbols.length > 0 ? (
+                            config.symbols.map((symbol, index) => (
+                              <div key={index} className="tag">
+                                {symbol}
+                                <button onClick={() => removeSymbol(symbol)}>×</button>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{color: '#999', fontStyle: 'italic', padding: '5px 0'}}>
+                              No symbols added
+                            </div>
+                          )}
+                        </div>
+                        <div style={{display: 'flex', gap: '10px'}}>
+                          <input
+                            type="text"
+                            value={symbolInput}
+                            onChange={(e) => setSymbolInput(e.target.value)}
+                            onKeyPress={handleSymbolInputKeyPress}
+                            placeholder="Add symbols (e.g. AAPL, MSFT, GOOG)"
+                          />
+                          <button className="btn" onClick={addSymbols}>Add</button>
+                        </div>
+                        <div className="helper-text">
+                          Enter one or more stock symbols separated by commas. Press Enter or click Add.
+                        </div>
+                        
+                        {config.symbols.length > 0 && (
+                          <div className="actions-container">
+                            <button 
+                              className="btn btn-danger" 
+                              onClick={clearAllSymbols}
+                              style={{fontSize: '12px'}}
+                            >
+                              Clear All Symbols
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Timeframe */}
+                      <div className="form-group">
+                        <label>Timeframe</label>
+                        <select
+                          value={config.timeframe}
+                          onChange={(e) => setConfig(prev => ({...prev, timeframe: e.target.value}))}
+                        >
+                          {timeframeOptions.map(option => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Date Range */}
+                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
+                        <div className="form-group">
+                          <label>Start Date</label>
+                          <input
+                            type="date"
+                            value={config.start_date}
+                            onChange={(e) => setConfig(prev => ({...prev, start_date: e.target.value}))}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>End Date</label>
+                          <input
+                            type="date"
+                            value={config.end_date}
+                            onChange={(e) => setConfig(prev => ({...prev, end_date: e.target.value}))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Technical Indicators */}
+                <div className="card">
+                  <div className="card-header" onClick={() => toggleSection('indicators')}>
+                    <span>Technical Indicators</span>
+                    <span>{expandedSections.indicators ? '▲' : '▼'}</span>
+                  </div>
+                  
+                  {expandedSections.indicators && (
+                    <div className="card-body">
+                      <div className="helper-text" style={{marginBottom: '10px'}}>
+                        Configure the technical indicators needed for your strategy.
+                      </div>
+                      
+                      {config.indicators.map((indicator, index) => (
+                        <div key={index} className="indicator-box">
+                          <div className="indicator-header">
+                            <h4 style={{margin: 0}}>Indicator {index + 1}</h4>
+                            <button 
+                              onClick={() => removeIndicator(index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#dc3545',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          
+                          <div style={{marginBottom: '10px'}}>
+                            <label className="form-group">Type</label>
+                            <select
+                              value={indicator.name}
+                              onChange={(e) => updateIndicator(index, 'name', e.target.value)}
+                              style={{marginBottom: '10px'}}
+                            >
+                              {indicatorTypes.map(type => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div className="params-grid">
+                            {Object.entries(indicator.params).map(([param, value]) => (
+                              <div key={param}>
+                                <label>{param}</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={value}
+                                  onChange={(e) => updateIndicator(index, `param_${param}`, e.target.value)}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        className="btn btn-purple"
+                        onClick={addIndicator}
+                        style={{width: '100%'}}
+                      >
+                        + Add Indicator
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Entry Conditions */}
+                <div className="card">
+                  <div className="card-header" onClick={() => toggleSection('entryConditions')}>
+                    <span>Entry Conditions</span>
+                    <span>{expandedSections.entryConditions ? '▲' : '▼'}</span>
+                  </div>
+                  
+                  {expandedSections.entryConditions && (
+                    <div className="card-body">
+                      <div className="helper-text" style={{marginBottom: '10px'}}>
+                        Define the conditions that must be met to enter a trade.
+                      </div>
+                      
+                      {config.entry_conditions.map((condition, index) => (
+                        <div key={index} className="condition-box">
+                          <div className="indicator-header">
+                            <h4 style={{margin: 0}}>Condition {index + 1}</h4>
+                            <button 
+                              onClick={() => removeCondition('entry_conditions', index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#dc3545',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          
+                          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '10px'}}>
+                            <div>
+                              <label>Indicator</label>
+                              <select
+                                value={condition.indicator}
+                                onChange={(e) => updateCondition('entry_conditions', index, 'indicator', e.target.value)}
+                              >
+                                {getAvailableIndicators().map(ind => (
+                                  <option key={ind} value={ind}>{ind}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label>Comparison</label>
+                              <select
+                                value={condition.comparison}
+                                onChange={(e) => updateCondition('entry_conditions', index, 'comparison', e.target.value)}
+                              >
+                                {comparisonOptions.map(option => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label>Value</label>
+                              {!condition.isCustomValue ? (
+                                <select
+                                  value={condition.value}
+                                  onChange={(e) => updateCondition('entry_conditions', index, 'value', e.target.value)}
+                                >
+                                  {getAvailableIndicators().map(ind => (
+                                    <option key={ind} value={ind}>{ind}</option>
+                                  ))}
+                                  <option value="custom">Custom value...</option>
+                                </select>
+                              ) : (
+                                <div style={{display: 'flex', gap: '5px'}}>
+                                  <input
+                                    type="text"
+                                    value={condition.value}
+                                    placeholder="Enter value"
+                                    onChange={(e) => updateCondition('entry_conditions', index, 'value', e.target.value)}
+                                    style={{flex: '1'}}
+                                  />
+                                  <button
+                                    onClick={() => updateCondition('entry_conditions', index, 'value', getAvailableIndicators()[0])}
+                                    style={{
+                                      background: '#eee',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      padding: '0 8px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        className="btn btn-green"
+                        onClick={() => addCondition('entry_conditions')}
+                        style={{width: '100%'}}
+                      >
+                        + Add Entry Condition
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Exit Conditions */}
+                <div className="card">
+                  <div className="card-header" onClick={() => toggleSection('exitConditions')}>
+                    <span>Exit Conditions</span>
+                    <span>{expandedSections.exitConditions ? '▲' : '▼'}</span>
+                  </div>
+                  
+                  {expandedSections.exitConditions && (
+                    <div className="card-body">
+                      <div className="helper-text" style={{marginBottom: '10px'}}>
+                        Define the conditions that will trigger closing a position.
+                      </div>
+                      
+                      {config.exit_conditions.map((condition, index) => (
+                        <div key={index} className="condition-box">
+                          <div className="indicator-header">
+                            <h4 style={{margin: 0}}>Condition {index + 1}</h4>
+                            <button 
+                              onClick={() => removeCondition('exit_conditions', index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#dc3545',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          
+                          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '10px'}}>
+                            <div>
+                              <label>Indicator</label>
+                              <select
+                                value={condition.indicator}
+                                onChange={(e) => updateCondition('exit_conditions', index, 'indicator', e.target.value)}
+                              >
+                                {getAvailableIndicators().map(ind => (
+                                  <option key={ind} value={ind}>{ind}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label>Comparison</label>
+                              <select
+                                value={condition.comparison}
+                                onChange={(e) => updateCondition('exit_conditions', index, 'comparison', e.target.value)}
+                              >
+                                {comparisonOptions.map(option => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label>Value</label>
+                              {!condition.isCustomValue ? (
+                                <select
+                                  value={condition.value}
+                                  onChange={(e) => updateCondition('exit_conditions', index, 'value', e.target.value)}
+                                >
+                                  {getAvailableIndicators().map(ind => (
+                                    <option key={ind} value={ind}>{ind}</option>
+                                  ))}
+                                  <option value="custom">Custom value...</option>
+                                </select>
+                              ) : (
+                                <div style={{display: 'flex', gap: '5px'}}>
+                                  <input
+                                    type="text"
+                                    value={condition.value}
+                                    placeholder="Enter value"
+                                    onChange={(e) => updateCondition('exit_conditions', index, 'value', e.target.value)}
+                                    style={{flex: '1'}}
+                                  />
+                                  <button
+                                    onClick={() => updateCondition('exit_conditions', index, 'value', getAvailableIndicators()[0])}
+                                    style={{
+                                      background: '#eee',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      padding: '0 8px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        className="btn btn-red"
+                        onClick={() => addCondition('exit_conditions')}
+                        style={{width: '100%'}}
+                      >
+                        + Add Exit Condition
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Risk Management */}
+                <div className="card">
+                  <div className="card-header" onClick={() => toggleSection('riskManagement')}>
+                    <span>Risk Management</span>
+                    <span>{expandedSections.riskManagement ? '▲' : '▼'}</span>
+                  </div>
+                  
+                  {expandedSections.riskManagement && (
+                    <div className="card-body">
+                      <div className="helper-text" style={{marginBottom: '10px'}}>
+                        Configure position sizing and risk control parameters.
+                      </div>
+                      
+                      <div className="form-group">
+                        <label>Position Sizing Method</label>
+                        <select
+                          value={config.risk_management.position_sizing_method}
+                          onChange={(e) => updateRiskManagement('position_sizing_method', e.target.value)}
+                        >
+                          {positionSizingMethods.map(method => (
+                            <option key={method} value={method}>{method}</option>
+                          ))}
+                        </select>
+                        <div className="helper-text">
+                          <ul style={{margin: '5px 0 0 20px', padding: 0, fontSize: '12px'}}>
+                            <li><strong>Risk-Based</strong>: Sizes positions based on risk percentage and stop loss distance</li>
+                            <li><strong>ATR-Based</strong>: Uses Average True Range for position sizing</li>
+                            <li><strong>Fixed</strong>: Uses a fixed position size for all trades</li>
+                            <li><strong>Percentage</strong>: Uses a percentage of available capital</li>
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
+                        <div className="form-group">
+                          <label>Risk Per Trade (%)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            max="10"
+                            value={config.risk_management.risk_per_trade}
+                            onChange={(e) => updateRiskManagement('risk_per_trade', e.target.value)}
+                          />
+                          <div className="helper-text">
+                            Percentage of account to risk on each trade
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Max Position Size</label>
+                          <input
+                            type="number"
+                            step="10"
+                            min="10"
+                            value={config.risk_management.max_position_size}
+                            onChange={(e) => updateRiskManagement('max_position_size', e.target.value)}
+                          />
+                          <div className="helper-text">
+                            Maximum position size in shares / currency units (crypto)
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Stop Loss</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={config.risk_management.stop_loss}
+                            onChange={(e) => updateRiskManagement('stop_loss', e.target.value)}
+                          />
+                          <div className="helper-text">
+                            Stop loss as a decimal (e.g., 0.02 = 2%)
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Take Profit</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={config.risk_management.take_profit}
+                            onChange={(e) => updateRiskManagement('take_profit', e.target.value)}
+                          />
+                          <div className="helper-text">
+                            Take profit as a decimal (e.g., 0.06 = 6%)
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>ATR Multiplier</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.5"
+                            value={config.risk_management.atr_multiplier}
+                            onChange={(e) => updateRiskManagement('atr_multiplier', e.target.value)}
+                          />
+                          <div className="helper-text">
+                            Multiplier for ATR-based stops and targets
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* YAML Output */}
+                <div className="card">
+                  <div className="card-header" onClick={() => toggleSection('yamlOutput')}>
+                    <span>YAML Output</span>
+                    <div>
+                      <button 
+                        className="btn" 
+                        onClick={downloadYaml} 
+                        style={{fontSize: '12px'}}
+                      >
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                  {expandedSections.yamlOutput && (
+                    <div className="card-body">
+                      <pre className="yaml-output">{yamlOutput}</pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // Render the component
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<TradingStrategyYamlEditor />);
+    </script>
+  </body>
+</html>
